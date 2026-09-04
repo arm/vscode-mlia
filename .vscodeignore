@@ -1,0 +1,18 @@
+# Development configuration and source
+.github/**
+.vscode/**
+.github/**
+.qlty/**
+src/**
+docs/**
+tsconfig.json
+.gitignore
+
+# Development and debug build output
+out/**
+node_modules/**
+**/*.map
+
+# Local Python runtime development overrides
+resources/python-runtime/.env
+resources/python-runtime/pyproject.dev.toml

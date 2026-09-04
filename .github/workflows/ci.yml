@@ -1,0 +1,202 @@
+# SPDX-FileCopyrightText: Copyright 2026, Arm Limited and/or its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+    tags:
+      - "v*.*.*"
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Unit tests (Node.js ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["20", "22"]
+    steps:
+      - name: Checkout MLIA for VS Code
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --prefer-offline --no-audit --fund=false
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v8.3.2
+        with:
+          version: "0.11.32"
+      - name: Run tests
+        run: npm test
+
+  build:
+    name: Build VSIX
+    needs: [tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout MLIA for VS Code
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --prefer-offline --no-audit --fund=false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v8.3.2
+        with:
+          version: "0.11.32"
+      - name: Check TypeScript
+        run: npm run lint
+      - name: Package extension
+        run: npm run package
+      - name: Upload VSIX
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: vsix-package
+          path: "*.vsix"
+          if-no-files-found: error
+      - name: Create extension SBOM
+        run: |
+          mkdir -p sbom
+          npm sbom --omit=dev --package-lock-only \
+            --sbom-format cyclonedx \
+            --sbom-type application \
+            > sbom/mlia-vscode.cdx.json
+          python scripts/add-sbom-disclaimer.py \
+            sbom/mlia-vscode.cdx.json
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: project-sbom
+          path: sbom/*.json
+          if-no-files-found: error
+
+  release-and-publish:
+    name: Release and publish
+    needs: [build]
+    if: github.repository_owner == 'arm' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download VSIX
+        uses: actions/download-artifact@v4
+        with:
+          name: vsix-package
+          path: artifacts/vsix
+      - name: Download SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: project-sbom
+          path: artifacts/sbom
+      - name: Publish GitHub release in public repo
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REF_NAME: ${{ github.ref_name }}
+          PRE_RELEASE: ${{ contains(github.ref_name, '-') }}
+        run: |
+          prerelease_args=()
+          if [ "$PRE_RELEASE" = "true" ]; then
+            prerelease_args+=(--prerelease)
+          fi
+          if gh release view "$REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$REF_NAME" artifacts/vsix/*.vsix artifacts/sbom/*.json \
+              --clobber
+          else
+            gh release create "$REF_NAME" artifacts/vsix/*.vsix artifacts/sbom/*.json \
+              --title "$REF_NAME" \
+              --generate-notes \
+              --verify-tag \
+              "${prerelease_args[@]}"
+          fi
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+      - name: Publish to VS Code Marketplace
+        run: npx --yes @vscode/vsce@3.9.2 publish --skip-duplicate -i artifacts/vsix/*.vsix -p "${VS_MARKETPLACE_TOKEN}" ${PRE_RELEASE_FLAG}
+        env:
+          VS_MARKETPLACE_TOKEN: ${{ secrets.VS_MARKETPLACE_TOKEN }}
+          PRE_RELEASE_FLAG: ${{ contains(github.ref_name, '-') && '--pre-release' || '' }}
+      - name: Publish to Open VSX
+        run: npx --yes ovsx@1.0.2 publish --skip-duplicate -i artifacts/vsix/*.vsix -p "${OPEN_VSX_TOKEN}" ${PRE_RELEASE_FLAG}
+        env:
+          OPEN_VSX_TOKEN: ${{ secrets.OPEN_VSX_TOKEN }}
+          PRE_RELEASE_FLAG: ${{ contains(github.ref_name, '-') && '--pre-release' || '' }}
+
+  sync-commits-to-public-repo:
+    name: Sync commits to public repo
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner != 'arm'
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout MLIA for VS Code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Checkout public MLIA for VS Code
+        uses: actions/checkout@v5
+        with:
+          repository: arm/mlia-vscode
+          token: ${{ secrets.ARM_ORG_TOKEN }}
+          path: target-repo
+          persist-credentials: true
+      - name: Push commits to public repo
+        env:
+          SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          cd target-repo
+          git remote add source "$SOURCE_URL"
+          git fetch source main
+          git checkout main
+          git merge source/main
+          git push origin main
+
+  sync-release-tags-to-public-repo:
+    name: Sync release tags to public repo
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && github.repository_owner != 'arm'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout MLIA for VS Code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Checkout public MLIA for VS Code
+        uses: actions/checkout@v5
+        with:
+          repository: arm/mlia-vscode
+          token: ${{ secrets.ARM_ORG_TOKEN }}
+          path: target-repo
+          persist-credentials: true
+      - name: Push tag to public repo
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          cd target-repo
+          git remote add source "$SOURCE_URL"
+          git fetch source --tags
+          git push origin "refs/tags/$REF_NAME"

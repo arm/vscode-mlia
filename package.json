@@ -1,0 +1,257 @@
+{
+  "name": "mlia-vscode",
+  "displayName": "MLIA for VS Code",
+  "description": "Run MLIA performance analyses and explore model results in Visual Studio Code.",
+  "version": "0.0.1",
+  "publisher": "Arm",
+  "license": "SEE LICENSE IN LICENSE",
+  "private": true,
+  "pricing": "Free",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Arm/mlia-vscode.git"
+  },
+  "homepage": "https://github.com/Arm/mlia-vscode#readme",
+  "bugs": {
+    "url": "https://github.com/Arm/mlia-vscode/issues"
+  },
+  "keywords": [
+    "mlia",
+    "machine-learning",
+    "performance",
+    "profiling",
+    "model-analysis",
+    "model-explorer"
+  ],
+  "icon": "resources/mlia.png",
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "Machine Learning",
+    "Visualization"
+  ],
+  "activationEvents": [
+    "onWebviewPanel:mliaModelExplorer"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "mlia",
+          "title": "MLIA",
+          "icon": "resources/mlia-wordmark.svg"
+        }
+      ]
+    },
+    "views": {
+      "mlia": [
+        {
+          "id": "mlia.newAnalysis",
+          "name": "New Analysis",
+          "type": "webview",
+          "initialSize": 2
+        },
+        {
+          "id": "mlia.currentAnalysis",
+          "name": "Current Analysis Run",
+          "type": "webview",
+          "initialSize": 3
+        },
+        {
+          "id": "mlia.analyses",
+          "name": "Analysis Runs",
+          "initialSize": 4
+        }
+      ]
+    },
+    "configuration": {
+      "title": "MLIA",
+      "properties": {
+        "mlia-vscode.syncModelExplorerSelectionToCode": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Open the corresponding source location when a user selects a node in any MLIA Model Explorer panel."
+        },
+        "mlia-vscode.autoOpenModelExplorer": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Automatically open Model Explorer while an analysis runs and when it completes. Completed analyses are still persisted and made current when disabled."
+        },
+        "mlia-vscode.showCodeLens": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Show MLIA analysis metrics and source navigation actions as CodeLens items."
+        },
+        "mlia-vscode.showHeatmap": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Show MLIA analysis heatmap colors in source editors."
+        },
+        "mlia-vscode.targetProfile": {
+          "type": "string",
+          "default": "",
+          "scope": "window",
+          "description": "Target profile used for new MLIA analyses. Existing analyses are unaffected. Select it from the New Analysis view after refreshing the environment."
+        },
+        "mlia-vscode.sourceFileMap": {
+          "type": "object",
+          "default": {},
+          "description": "Maps source paths from embedded debug information to local source paths. Entries are prefix mappings from an embedded source path to the corresponding path on this machine. Absolute mappings apply to absolute source paths, for example \"/root/build-folder/\" -> \"/home/dev/source-checkout/\" maps \"/root/build-folder/foo.cpp\" to \"/home/dev/source-checkout/foo.cpp\". Relative mappings apply to relative source paths, for example \"src/model\" -> \"/home/dev/source-checkout\" maps \"src/model/foo.cpp\" to \"/home/dev/source-checkout/foo.cpp\".",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "mlia-vscode.configFileContents": {
+          "type": "string",
+          "default": "# MLIA configuration for analyses started by this VS Code extension.\n# Changes apply only to new analyses.\n# Supported core settings: https://github.com/Arm/mlia#configuration\n\n[[filtering.collapse]]\nkind = \"code_stack\"\nattribute = \"file\"\nglobs = [\n    \"**/site-packages/torch/**\",\n    \"**/site-packages/executorch/**\",\n]\n",
+          "scope": "window",
+          "editPresentation": "multilineText",
+          "description": "Contents of the MLIA TOML configuration file used by analyses started from VS Code. The extension writes this text to its managed runtime and applies it through the MLIA watchdog before each analysis."
+        },
+        "mlia-vscode.extraCommandLineArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "scope": "window",
+          "description": "Extra command-line arguments appended unchanged to MLIA analyses started by VS Code. Intended for advanced users."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "mlia-vscode.refreshPythonVenv",
+        "title": "Refresh MLIA Environment",
+        "icon": "$(refresh)",
+        "enablement": "!mlia.environmentRefreshing"
+      },
+      {
+        "command": "mlia-vscode.forceRefreshPythonVenv",
+        "title": "Force Refresh MLIA Environment",
+        "enablement": "!mlia.environmentRefreshing"
+      },
+      {
+        "command": "mlia-vscode.showMliaInfo",
+        "title": "Show MLIA Information",
+        "icon": "$(info)"
+      },
+      {
+        "command": "mlia-vscode.openSettings",
+        "title": "Open MLIA Settings",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "mlia-vscode.openCurrentModelExplorer",
+        "title": "Open Model Explorer",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "mlia-vscode.checkPerformance",
+        "title": "Run MLIA Analysis",
+        "icon": "$(play)"
+      },
+      {
+        "command": "mlia-vscode.cancelAnalysis",
+        "title": "Cancel Analysis",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "mlia-vscode.deleteAnalysis",
+        "title": "Delete Analysis Run",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "mlia-vscode.openAnalysisFolder",
+        "title": "Open Analysis Run Folder",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "mlia-vscode.openAnalysesFolder",
+        "title": "Open Analysis Runs Folder",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "mlia-vscode.clearAllAnalyses",
+        "title": "Clear All Analysis Runs",
+        "icon": "$(clear-all)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "mlia-vscode.showMliaInfo",
+          "when": "view == mlia.newAnalysis",
+          "group": "navigation@1"
+        },
+        {
+          "command": "mlia-vscode.refreshPythonVenv",
+          "when": "view == mlia.newAnalysis",
+          "group": "navigation@2"
+        },
+        {
+          "command": "mlia-vscode.openSettings",
+          "when": "view == mlia.newAnalysis",
+          "group": "navigation@3"
+        },
+        {
+          "command": "mlia-vscode.openCurrentModelExplorer",
+          "when": "view == mlia.currentAnalysis && mlia.currentAnalysisCanOpenModelExplorer",
+          "group": "navigation@1"
+        },
+        {
+          "command": "mlia-vscode.openAnalysesFolder",
+          "when": "view == mlia.analyses",
+          "group": "navigation@1"
+        },
+        {
+          "command": "mlia-vscode.clearAllAnalyses",
+          "when": "view == mlia.analyses",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "mlia-vscode.cancelAnalysis",
+          "when": "view == mlia.analyses && viewItem == analysis.running.controllable.other",
+          "group": "inline@1"
+        },
+        {
+          "command": "mlia-vscode.openAnalysisFolder",
+          "when": "view == mlia.analyses",
+          "group": "inline@2"
+        },
+        {
+          "command": "mlia-vscode.deleteAnalysis",
+          "when": "view == mlia.analyses && !(viewItem =~ /analysis\\.running/)",
+          "group": "inline@3"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run bundle",
+    "package": "vsce package --no-dependencies",
+    "package:extension": "vsce package --no-dependencies",
+    "lint": "npm run compile",
+    "bundle": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --sourcemap --outfile=dist/extension.js",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "npm run compile && node --test out/test/analysisActivation.test.js out/test/analysisInputs.test.js out/test/analysisLifecycle.test.js out/test/analysisPanels.test.js out/test/analysisStore.test.js out/test/checkPerformance.test.js out/test/currentAnalysisView.test.js out/test/environmentState.test.js out/test/extensionManifest.test.js out/test/newAnalysisView.test.js out/test/modelExplorerWebview.test.js out/test/overlayCatalog.test.js out/test/overlaySynchronization.test.js out/test/pythonRuntime.test.js out/test/sourceCodeLens.test.js out/test/sourceDecorations.test.js out/test/sourceLines.test.js out/test/sourceNavigation.test.js out/test/sourceOverlayActions.test.js out/test/uvBootstrap.test.js out/test/watchdog.test.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/vscode": "^1.100.0",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.28.2",
+    "extract-zip": "^2.0.1",
+    "tar": "^7.5.22",
+    "typescript": "^5.8.0"
+  }
+}

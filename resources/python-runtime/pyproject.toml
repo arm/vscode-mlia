@@ -1,0 +1,22 @@
+[project]
+name = "mlia-vscode-runtime"
+version = "0.0.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "ethos-u-vela",
+    "mlia",
+    "mlia-ethos-u",
+    "mlia-neural-technology",
+    "mlia-model-explorer[vgf,onnx]",
+]
+
+# Local development overrides:
+# Create a pyproject.dev.toml next to this file to append extra
+# runtime configuration when the extension builds the venv pyproject.
+# Create a gitignored .env next to this file to pass local environment variables
+# to uv commands, for example VENDORED_ARTIFACTS_URLS={...}.
+#
+# Example pyproject.dev.toml:
+#
+# [tool.uv.sources]
+# mlia = { path = "E:/XPK/mlia/mlia", editable = true }

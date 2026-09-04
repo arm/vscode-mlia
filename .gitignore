@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build output
+out/
+dist/
+
+# VS Code extension test/runtime output
+.vscode-test/
+.vscode-test-web/
+
+# Packaged extensions
+*.vsix
+
+# Local Python runtime development overrides
+resources/python-runtime/pyproject.dev.toml
+resources/python-runtime/.env
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.swp
+
+# Local environment files
+.env
+.env.*
+!.env.example

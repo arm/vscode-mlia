@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: Copyright 2026, Arm Limited and/or its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
+name: Lint and Format
+
+on:
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-format:
+    runs-on: ${{ vars.LINUX_RUNNER }}
+    steps:
+      - name: Checkout MLIA for VS Code
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Install Qlty
+        uses: qltysh/qlty-action/install@a2277a908db90c4c868832fb9204521fb940fdb4 # v1.2.0
+      - name: Check lint
+        run: qlty check

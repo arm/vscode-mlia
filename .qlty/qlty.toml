@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: Copyright 2026, Arm Limited and/or its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
+config_version = "0"
+
+exclude_patterns = [
+  "**/*.d.ts",
+  "**/dist/**",
+  "**/node_modules/**",
+  "**/out/**",
+]
+
+test_patterns = [
+  "**/test/**",
+  "**/*.test.*",
+]
+
+[smells]
+mode = "comment"
+
+[[plugin]]
+name = "gitleaks"
+mode = "block"
+
+[[plugin]]
+name = "bandit"
+mode = "comment"
+
+[[plugin]]
+name = "osv-scanner"
+mode = "monitor"
+
+[[plugin]]
+name = "actionlint"
+mode = "comment"
+
+[[plugin]]
+name = "zizmor"
+mode = "comment"
+
+[[source]]
+name = "default"
+default = true
