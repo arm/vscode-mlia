@@ -101,12 +101,12 @@ jobs:
       contents: write
     steps:
       - name: Download VSIX
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: vsix-package
           path: artifacts/vsix
       - name: Download SBOM
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: project-sbom
           path: artifacts/sbom
