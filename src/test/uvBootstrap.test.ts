@@ -19,7 +19,7 @@ import {
 const tempDirs: string[] = [];
 
 async function makeStorage(): Promise<string> {
-  const storage = await fs.mkdtemp(path.join(os.tmpdir(), "mlia-vscode-uv-test-"));
+  const storage = await fs.mkdtemp(path.join(os.tmpdir(), "vscode-mlia-uv-test-"));
   tempDirs.push(storage);
   return storage;
 }

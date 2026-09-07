@@ -1,7 +1,7 @@
 import { Analysis } from "./analysisStore";
 import type { ModelExplorerFocusIntent } from "./modelExplorerWebview";
 
-export const activateAnalysisCommand = "mlia-vscode.activateAnalysis";
+export const activateAnalysisCommand = "vscode-mlia.activateAnalysis";
 
 export interface AnalysisActivationCommand {
   command: typeof activateAnalysisCommand;

@@ -74,7 +74,7 @@ Use the folder action on the run's row to open its output folder when partial ou
 
 ## Model Explorer does not open
 
-- Confirm that [`mlia-vscode.autoOpenModelExplorer`](configuration.md#auto-open-model-explorer) is enabled, or reopen the saved run from **Analysis Runs**.
+- Confirm that [`vscode-mlia.autoOpenModelExplorer`](configuration.md#auto-open-model-explorer) is enabled, or reopen the saved run from **Analysis Runs**.
 - Make sure the run completed and generated a Model Explorer bundle.
 - Inspect the panel error and MLIA log if the generated HTML, standardized output, or mapping data cannot be loaded.
 - Reopen the saved run from Analysis Runs.
@@ -84,7 +84,7 @@ Use the folder action on the run's row to open its output folder when partial ou
 Expand **Source mappings** in Current Analysis Run.
 
 - If no source locations are reported, the MLIA result may not contain usable code-stack source attributes.
-- If locations are reported but not accessible, configure [`mlia-vscode.sourceFileMap`](configuration.md#source-file-map). See [Source-file mapping](source-file-mapping.md).
+- If locations are reported but not accessible, configure [`vscode-mlia.sourceFileMap`](configuration.md#source-file-map). See [Source-file mapping](source-file-mapping.md).
 - Confirm that embedded line numbers are valid and within the local file.
 - A Model Explorer node mapped to multiple different locations cannot be opened unambiguously.
 
@@ -97,7 +97,7 @@ If expected heatmaps or CodeLens entries are absent:
 3. Configure [source-file mapping](source-file-mapping.md) when the embedded paths do not match those on your machine.
 4. Open a source file listed as accessible in **Source mappings**.
 5. Select an overlay rather than **None** in Current Analysis Run or Model Explorer.
-6. Enable [`mlia-vscode.showHeatmap`](configuration.md#show-heatmap) and [`mlia-vscode.showCodeLens`](configuration.md#show-code-lens).
+6. Enable [`vscode-mlia.showHeatmap`](configuration.md#show-heatmap) and [`vscode-mlia.showCodeLens`](configuration.md#show-code-lens).
 7. Confirm that VS Code's general `editor.codeLens` setting is enabled. This setting controls all CodeLens contributions, including MLIA's.
 8. Confirm that the selected overlay contains a value for the source line.
 9. Check that the completed run is still the current analysis.

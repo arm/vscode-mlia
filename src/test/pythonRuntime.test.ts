@@ -56,7 +56,7 @@ async function makeFixture(): Promise<{
   globalStoragePath: string;
   uvExecutable: string;
 }> {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "mlia-vscode-test-"));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "vscode-mlia-test-"));
   tempDirs.push(root);
 
   const extensionPath = path.join(root, "extension");
@@ -66,7 +66,7 @@ async function makeFixture(): Promise<{
   await fs.mkdir(runtimeResourcePath, { recursive: true });
   await fs.writeFile(
     path.join(runtimeResourcePath, "pyproject.toml"),
-    `[project]\nname = "mlia-vscode-runtime"\nversion = "0.0.0"\ndependencies = ["mlia"]\n`,
+    `[project]\nname = "vscode-mlia-runtime"\nversion = "0.0.0"\ndependencies = ["mlia"]\n`,
     "utf8",
   );
 
@@ -229,7 +229,7 @@ describe("refreshPythonRuntime", () => {
     await assert.rejects(fs.stat(staleGeneratedFile), /ENOENT/);
     assert.strictEqual(
       await fs.readFile(path.join(runtimeDir, "pyproject.toml"), "utf8"),
-      `[project]\nname = "mlia-vscode-runtime"\nversion = "0.0.0"\ndependencies = ["mlia"]\n`,
+      `[project]\nname = "vscode-mlia-runtime"\nversion = "0.0.0"\ndependencies = ["mlia"]\n`,
     );
     assert.deepStrictEqual(calls[0], `uv venv ${path.join(runtimeDir, ".venv")}`);
     assert.deepStrictEqual(calls[1], "uv sync --reinstall");

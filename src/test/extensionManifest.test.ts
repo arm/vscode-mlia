@@ -67,58 +67,58 @@ describe("MLIA views", () => {
     const titleActions = (manifest.contributes.menus as unknown as { "view/title": MenuContribution[] })["view/title"];
     assert.deepStrictEqual(titleActions, [
       {
-        command: "mlia-vscode.showMliaInfo",
+        command: "vscode-mlia.showMliaInfo",
         when: "view == mlia.newAnalysis",
         group: "navigation@1",
       },
       {
-        command: "mlia-vscode.refreshPythonVenv",
+        command: "vscode-mlia.refreshPythonVenv",
         when: "view == mlia.newAnalysis",
         group: "navigation@2",
       },
       {
-        command: "mlia-vscode.openSettings",
+        command: "vscode-mlia.openSettings",
         when: "view == mlia.newAnalysis",
         group: "navigation@3",
       },
       {
-        command: "mlia-vscode.openCurrentModelExplorer",
+        command: "vscode-mlia.openCurrentModelExplorer",
         when: "view == mlia.currentAnalysis && mlia.currentAnalysisCanOpenModelExplorer",
         group: "navigation@1",
       },
       {
-        command: "mlia-vscode.openAnalysesFolder",
+        command: "vscode-mlia.openAnalysesFolder",
         when: "view == mlia.analyses",
         group: "navigation@1",
       },
       {
-        command: "mlia-vscode.clearAllAnalyses",
+        command: "vscode-mlia.clearAllAnalyses",
         when: "view == mlia.analyses",
         group: "navigation@2",
       },
     ]);
     assert.deepStrictEqual(
-      manifest.contributes.commands.find(({ command }) => command === "mlia-vscode.showMliaInfo"),
+      manifest.contributes.commands.find(({ command }) => command === "vscode-mlia.showMliaInfo"),
       {
-        command: "mlia-vscode.showMliaInfo",
+        command: "vscode-mlia.showMliaInfo",
         title: "Show MLIA Information",
         icon: "$(info)",
       },
     );
     assert.deepStrictEqual(
-      manifest.contributes.commands.find(({ command }) => command === "mlia-vscode.openSettings"),
+      manifest.contributes.commands.find(({ command }) => command === "vscode-mlia.openSettings"),
       {
-        command: "mlia-vscode.openSettings",
+        command: "vscode-mlia.openSettings",
         title: "Open MLIA Settings",
         icon: "$(gear)",
       },
     );
     assert.deepStrictEqual(
       manifest.contributes.commands.find(
-        ({ command }) => command === "mlia-vscode.openCurrentModelExplorer",
+        ({ command }) => command === "vscode-mlia.openCurrentModelExplorer",
       ),
       {
-        command: "mlia-vscode.openCurrentModelExplorer",
+        command: "vscode-mlia.openCurrentModelExplorer",
         title: "Open Model Explorer",
         icon: "$(open-preview)",
       },
@@ -129,17 +129,17 @@ describe("MLIA views", () => {
     assert.deepStrictEqual(
       manifest.contributes.commands
         .filter(({ command }) =>
-          command === "mlia-vscode.refreshPythonVenv" ||
-          command === "mlia-vscode.forceRefreshPythonVenv"
+          command === "vscode-mlia.refreshPythonVenv" ||
+          command === "vscode-mlia.forceRefreshPythonVenv"
         )
         .map(({ command, enablement }) => ({ command, enablement })),
       [
         {
-          command: "mlia-vscode.refreshPythonVenv",
+          command: "vscode-mlia.refreshPythonVenv",
           enablement: "!mlia.environmentRefreshing",
         },
         {
-          command: "mlia-vscode.forceRefreshPythonVenv",
+          command: "vscode-mlia.forceRefreshPythonVenv",
           enablement: "!mlia.environmentRefreshing",
         },
       ],
@@ -152,20 +152,20 @@ describe("MLIA settings", () => {
     assert.deepStrictEqual(
       Object.fromEntries(
         [
-          "mlia-vscode.syncModelExplorerSelectionToCode",
-          "mlia-vscode.autoOpenModelExplorer",
-          "mlia-vscode.showCodeLens",
-          "mlia-vscode.showHeatmap",
+          "vscode-mlia.syncModelExplorerSelectionToCode",
+          "vscode-mlia.autoOpenModelExplorer",
+          "vscode-mlia.showCodeLens",
+          "vscode-mlia.showHeatmap",
         ].map((key) => [key, manifest.contributes.configuration.properties[key]]),
       ),
       {
-        "mlia-vscode.syncModelExplorerSelectionToCode": {
+        "vscode-mlia.syncModelExplorerSelectionToCode": {
           type: "boolean",
           default: true,
           scope: "window",
           description: "Open the corresponding source location when a user selects a node in any MLIA Model Explorer panel.",
         },
-        "mlia-vscode.autoOpenModelExplorer": {
+        "vscode-mlia.autoOpenModelExplorer": {
           type: "boolean",
           default: true,
           scope: "window",
@@ -173,13 +173,13 @@ describe("MLIA settings", () => {
             "Automatically open Model Explorer while an analysis runs and when it completes. " +
             "Completed analyses are still persisted and made current when disabled.",
         },
-        "mlia-vscode.showCodeLens": {
+        "vscode-mlia.showCodeLens": {
           type: "boolean",
           default: true,
           scope: "window",
           description: "Show MLIA analysis metrics and source navigation actions as CodeLens items.",
         },
-        "mlia-vscode.showHeatmap": {
+        "vscode-mlia.showHeatmap": {
           type: "boolean",
           default: true,
           scope: "window",
@@ -191,7 +191,7 @@ describe("MLIA settings", () => {
 
   it("clarifies that target profile changes only affect new analyses", () => {
     assert.deepStrictEqual(
-      manifest.contributes.configuration.properties["mlia-vscode.targetProfile"],
+      manifest.contributes.configuration.properties["vscode-mlia.targetProfile"],
       {
         type: "string",
         default: "",
@@ -205,7 +205,7 @@ describe("MLIA settings", () => {
 
   it("declares MLIA configuration contents as multiline text", () => {
     assert.deepStrictEqual(
-      manifest.contributes.configuration.properties["mlia-vscode.configFileContents"],
+      manifest.contributes.configuration.properties["vscode-mlia.configFileContents"],
       {
         type: "string",
         default: [
@@ -234,7 +234,7 @@ describe("MLIA settings", () => {
 
   it("declares extra MLIA command-line arguments as a string array", () => {
     assert.deepStrictEqual(
-      manifest.contributes.configuration.properties["mlia-vscode.extraCommandLineArgs"],
+      manifest.contributes.configuration.properties["vscode-mlia.extraCommandLineArgs"],
       {
         type: "array",
         items: { type: "string" },
@@ -252,7 +252,7 @@ describe("CodeLens commands", () => {
   it("does not contribute the obsolete current-analysis CodeLens command", () => {
     assert.strictEqual(
       manifest.contributes.commands.some(
-        ({ command }) => command === "mlia-vscode.openCurrentAnalysis",
+        ({ command }) => command === "vscode-mlia.openCurrentAnalysis",
       ),
       false,
     );
@@ -264,40 +264,40 @@ describe("analysis run actions", () => {
     assert.deepStrictEqual(
       manifest.contributes.commands.map(({ command }) => command),
       [
-        "mlia-vscode.refreshPythonVenv",
-        "mlia-vscode.forceRefreshPythonVenv",
-        "mlia-vscode.showMliaInfo",
-        "mlia-vscode.openSettings",
-        "mlia-vscode.openCurrentModelExplorer",
-        "mlia-vscode.checkPerformance",
-        "mlia-vscode.cancelAnalysis",
-        "mlia-vscode.deleteAnalysis",
-        "mlia-vscode.openAnalysisFolder",
-        "mlia-vscode.openAnalysesFolder",
-        "mlia-vscode.clearAllAnalyses",
+        "vscode-mlia.refreshPythonVenv",
+        "vscode-mlia.forceRefreshPythonVenv",
+        "vscode-mlia.showMliaInfo",
+        "vscode-mlia.openSettings",
+        "vscode-mlia.openCurrentModelExplorer",
+        "vscode-mlia.checkPerformance",
+        "vscode-mlia.cancelAnalysis",
+        "vscode-mlia.deleteAnalysis",
+        "vscode-mlia.openAnalysisFolder",
+        "vscode-mlia.openAnalysesFolder",
+        "vscode-mlia.clearAllAnalyses",
       ],
     );
   });
 
   it("shows cancel only for running analyses owned by this extension host", () => {
-    assert.deepStrictEqual(action("mlia-vscode.cancelAnalysis"), {
-      command: "mlia-vscode.cancelAnalysis",
+    assert.deepStrictEqual(action("vscode-mlia.cancelAnalysis"), {
+      command: "vscode-mlia.cancelAnalysis",
       when: "view == mlia.analyses && viewItem == analysis.running.controllable.other",
       group: "inline@1",
     });
   });
 
   it("shows the run-folder action for every analysis", () => {
-    assert.deepStrictEqual(action("mlia-vscode.openAnalysisFolder"), {
-      command: "mlia-vscode.openAnalysisFolder",
+    assert.deepStrictEqual(action("vscode-mlia.openAnalysisFolder"), {
+      command: "vscode-mlia.openAnalysisFolder",
       when: "view == mlia.analyses",
       group: "inline@2",
     });
   });
 
   it("shows delete only for non-running analyses", () => {
-    assert.deepStrictEqual(action("mlia-vscode.deleteAnalysis"), {
-      command: "mlia-vscode.deleteAnalysis",
+    assert.deepStrictEqual(action("vscode-mlia.deleteAnalysis"), {
+      command: "vscode-mlia.deleteAnalysis",
       when: "view == mlia.analyses && !(viewItem =~ /analysis\\.running/)",
       group: "inline@3",
     });
@@ -306,23 +306,23 @@ describe("analysis run actions", () => {
   it("contributes analysis-folder commands and the clear-all command", () => {
     assert.deepStrictEqual(
       manifest.contributes.commands.filter(({ command }) =>
-        command === "mlia-vscode.openAnalysisFolder" ||
-        command === "mlia-vscode.openAnalysesFolder" ||
-        command === "mlia-vscode.clearAllAnalyses"
+        command === "vscode-mlia.openAnalysisFolder" ||
+        command === "vscode-mlia.openAnalysesFolder" ||
+        command === "vscode-mlia.clearAllAnalyses"
       ),
       [
         {
-          command: "mlia-vscode.openAnalysisFolder",
+          command: "vscode-mlia.openAnalysisFolder",
           title: "Open Analysis Run Folder",
           icon: "$(folder-opened)",
         },
         {
-          command: "mlia-vscode.openAnalysesFolder",
+          command: "vscode-mlia.openAnalysesFolder",
           title: "Open Analysis Runs Folder",
           icon: "$(folder-opened)",
         },
         {
-          command: "mlia-vscode.clearAllAnalyses",
+          command: "vscode-mlia.clearAllAnalyses",
           title: "Clear All Analysis Runs",
           icon: "$(clear-all)",
         },

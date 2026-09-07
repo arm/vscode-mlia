@@ -99,7 +99,7 @@ Deleting a run also removes its stored output directory.
 
 ## Advanced arguments
 
-The [`mlia-vscode.extraCommandLineArgs`](configuration.md#extra-command-line-args) setting appends arguments unchanged to the generated `mlia check` command. Use this only when an option is not represented in the extension interface.
+The [`vscode-mlia.extraCommandLineArgs`](configuration.md#extra-command-line-args) setting appends arguments unchanged to the generated `mlia check` command. Use this only when an option is not represented in the extension interface.
 
 Extra arguments can override or conflict with extension-managed arguments. Review the [MLIA CLI Guide](https://github.com/arm/mlia/blob/main/docs/source/cli.md#backend-specific-options) and inspect the MLIA output log when using this setting.
 

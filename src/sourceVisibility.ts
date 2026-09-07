@@ -1,5 +1,5 @@
-export const showCodeLensConfiguration = "mlia-vscode.showCodeLens";
-export const showHeatmapConfiguration = "mlia-vscode.showHeatmap";
+export const showCodeLensConfiguration = "vscode-mlia.showCodeLens";
+export const showHeatmapConfiguration = "vscode-mlia.showHeatmap";
 
 export interface SourceVisibilityConfigurationChange {
   affectsConfiguration: (section: string) => boolean;

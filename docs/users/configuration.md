@@ -12,14 +12,14 @@ Unless stated otherwise, changes apply to the current VS Code window or workspac
 ## General behaviour
 
 <a id="auto-open-model-explorer"></a>
-### `mlia-vscode.autoOpenModelExplorer`
+### `vscode-mlia.autoOpenModelExplorer`
 
 Default: `true`
 
 Automatically opens Model Explorer while an analysis runs and when it completes. When disabled, completed analyses are still saved and made current.
 
 <a id="sync-model-explorer-selection-to-code"></a>
-### `mlia-vscode.syncModelExplorerSelectionToCode`
+### `vscode-mlia.syncModelExplorerSelectionToCode`
 
 Default: `true`
 
@@ -28,14 +28,14 @@ Opens the corresponding source location when a selected Model Explorer node has 
 ## Source presentation
 
 <a id="show-code-lens"></a>
-### `mlia-vscode.showCodeLens`
+### `vscode-mlia.showCodeLens`
 
 Default: `true`
 
 Shows MLIA overlay values and source-navigation actions as CodeLens entries.
 
 <a id="show-heatmap"></a>
-### `mlia-vscode.showHeatmap`
+### `vscode-mlia.showHeatmap`
 
 Default: `true`
 
@@ -44,7 +44,7 @@ Shows overlay colours on mapped lines in visible source editors.
 ## Analysis defaults
 
 <a id="target-profile"></a>
-### `mlia-vscode.targetProfile`
+### `vscode-mlia.targetProfile`
 
 Default: empty
 
@@ -53,7 +53,7 @@ Stores the target profile used for new analyses. Select the profile from New Ana
 ## Advanced MLIA configuration
 
 <a id="extra-command-line-args"></a>
-### `mlia-vscode.extraCommandLineArgs`
+### `vscode-mlia.extraCommandLineArgs`
 
 Default: `[]`
 
@@ -63,7 +63,7 @@ Example:
 
 ```json
 {
-  "mlia-vscode.extraCommandLineArgs": [
+  "vscode-mlia.extraCommandLineArgs": [
     "--some-advanced-option",
     "value"
   ]
@@ -73,7 +73,7 @@ Example:
 Use this only for MLIA options that the extension does not expose. Conflicting arguments can make a run fail or behave unexpectedly.
 
 <a id="config-file-contents"></a>
-### `mlia-vscode.configFileContents`
+### `vscode-mlia.configFileContents`
 
 Contains the complete MLIA TOML configuration applied to analyses started by the extension. Changes affect new analyses only.
 
@@ -94,7 +94,7 @@ See the [MLIA configuration documentation](https://github.com/Arm/mlia#configura
 ## Source-file mapping
 
 <a id="source-file-map"></a>
-### `mlia-vscode.sourceFileMap`
+### `vscode-mlia.sourceFileMap`
 
 Default: `{}`
 
@@ -104,7 +104,7 @@ Example:
 
 ```json
 {
-  "mlia-vscode.sourceFileMap": {
+  "vscode-mlia.sourceFileMap": {
     "/build/workspace/project": "C:/src/project",
     "src/model": "C:/src/project/model"
   }

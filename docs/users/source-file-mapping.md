@@ -7,7 +7,7 @@ SPDX-License-Identifier: Apache-2.0
 
 MLIA results can contain source paths embedded by a build machine, container, CI worker, or another checkout. Source-file mapping translates those paths to files on your machine.
 
-Configure mappings with [`mlia-vscode.sourceFileMap`](configuration.md#source-file-map).
+Configure mappings with [`vscode-mlia.sourceFileMap`](configuration.md#source-file-map).
 
 ## Mapping format
 
@@ -15,7 +15,7 @@ The setting is an object whose keys are embedded source prefixes and whose value
 
 ```json
 {
-  "mlia-vscode.sourceFileMap": {
+  "vscode-mlia.sourceFileMap": {
     "/root/build/project": "C:/src/project"
   }
 }
@@ -41,7 +41,7 @@ Use an absolute embedded prefix when the debug information contains an absolute 
 
 ```json
 {
-  "mlia-vscode.sourceFileMap": {
+  "vscode-mlia.sourceFileMap": {
     "/home/ci/ml-project": "D:/work/ml-project"
   }
 }
@@ -55,7 +55,7 @@ Mappings can also match relative source paths:
 
 ```json
 {
-  "mlia-vscode.sourceFileMap": {
+  "vscode-mlia.sourceFileMap": {
     "src/model": "D:/work/ml-project/model"
   }
 }
@@ -75,7 +75,7 @@ Example with overlapping prefixes:
 
 ```json
 {
-  "mlia-vscode.sourceFileMap": {
+  "vscode-mlia.sourceFileMap": {
     "/build": "D:/source",
     "/build/generated": "D:/generated-source"
   }

@@ -13,7 +13,7 @@ Source presentation is available when the completed MLIA result contains:
 
 - Code-stack data with valid `file` and `line` attributes.
 - Mappings that connect MLIA results to Model Explorer nodes.
-- Local source files matching the embedded paths, either directly or through [`mlia-vscode.sourceFileMap`](configuration.md#source-file-map).
+- Local source files matching the embedded paths, either directly or through [`vscode-mlia.sourceFileMap`](configuration.md#source-file-map).
 
 The Current Analysis Run view reports the number of code stacks, mapped code stacks, distinct source locations, and locations accessible on the local machine.
 
@@ -32,7 +32,7 @@ The heatmap updates when you:
 - Open another mapped source file.
 - Change source-file mappings.
 
-Disable heatmaps with [`mlia-vscode.showHeatmap`](configuration.md#show-heatmap).
+Disable heatmaps with [`vscode-mlia.showHeatmap`](configuration.md#show-heatmap).
 
 ## CodeLens metrics
 
@@ -45,7 +45,7 @@ CodeLens entries can appear above mapped source lines. For the selected overlay,
 
 Hover over a CodeLens entry for details about unavailable metric data.
 
-Disable these entries with [`mlia-vscode.showCodeLens`](configuration.md#show-code-lens).
+Disable these entries with [`vscode-mlia.showCodeLens`](configuration.md#show-code-lens).
 
 ## Navigate from source to Model Explorer
 
@@ -55,7 +55,7 @@ Caller and called-source CodeLens actions open the related source line and synch
 
 ## Navigate from Model Explorer to source
 
-With [`mlia-vscode.syncModelExplorerSelectionToCode`](configuration.md#sync-model-explorer-selection-to-code) enabled, selecting a mapped node in Model Explorer opens the resolved source file and briefly highlights the corresponding line.
+With [`vscode-mlia.syncModelExplorerSelectionToCode`](configuration.md#sync-model-explorer-selection-to-code) enabled, selecting a mapped node in Model Explorer opens the resolved source file and briefly highlights the corresponding line.
 
 The extension preserves Model Explorer focus where possible and opens source in another editor group.
 

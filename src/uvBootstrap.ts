@@ -256,7 +256,7 @@ async function hasValidInstallation(
 ): Promise<boolean> {
   try {
     const [metadataText] = await Promise.all([
-      fs.readFile(path.join(installDir, "mlia-vscode-uv.json"), "utf8"),
+      fs.readFile(path.join(installDir, "vscode-mlia-uv.json"), "utf8"),
       fs.access(executablePath, fsConstants.F_OK),
     ]);
     const metadata = JSON.parse(metadataText) as Partial<UvInstallMetadata>;
@@ -283,7 +283,7 @@ async function writeInstallMetadata(
     archiveSha256,
   };
   await fs.writeFile(
-    path.join(installDir, "mlia-vscode-uv.json"),
+    path.join(installDir, "vscode-mlia-uv.json"),
     `${JSON.stringify(metadata, undefined, 2)}\n`,
     "utf8",
   );
@@ -371,7 +371,7 @@ async function downloadFile(url: string, destination: string): Promise<void> {
 function requestDownload(url: string, redirectsRemaining: number): Promise<import("http").IncomingMessage> {
   return new Promise((resolve, reject) => {
     const requestHandle = https.get(url, {
-      headers: { "User-Agent": `mlia-vscode uv-bootstrap/${managedUvVersion}` },
+      headers: { "User-Agent": `vscode-mlia uv-bootstrap/${managedUvVersion}` },
     }, (response) => {
       const statusCode = response.statusCode ?? 0;
       const location = response.headers.location;

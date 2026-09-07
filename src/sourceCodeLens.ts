@@ -8,7 +8,7 @@ import {
   sourceRecordMatchesOverlay,
 } from "./sourceLines";
 
-export const sourceOverlayActionCommand = "mlia-vscode.executeSourceOverlayAction";
+export const sourceOverlayActionCommand = "vscode-mlia.executeSourceOverlayAction";
 
 export type SourceCodeLensKind = "caller" | "overlay" | "called";
 

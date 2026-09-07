@@ -44,7 +44,7 @@ Use whole-line text decorations with semi-transparent backgrounds to show relati
 - Numeric metrics use a bounded green-to-red scale.
 - Partial or unavailable values must not be distinguished by hue alone. Use opacity, borders, glyphs, or explanatory text as appropriate.
 - Colors must remain legible in light, dark, and high-contrast themes.
-- Users can disable the heatmap with `mlia-vscode.showHeatmap`.
+- Users can disable the heatmap with `vscode-mlia.showHeatmap`.
 
 Decorations should be batched by style and visible editor. Decoration types should be reused and disposed when no longer needed. A bounded set of heat buckets may replace exact colors if real analyses create excessive decoration types.
 
@@ -60,7 +60,7 @@ CodeLens is appropriate for:
 - caller and called-source navigation;
 - explanations of partial or unavailable data.
 
-CodeLens should not be placed so densely that it dominates the source layout. Users can disable it with `mlia-vscode.showCodeLens`.
+CodeLens should not be placed so densely that it dominates the source layout. Users can disable it with `vscode-mlia.showCodeLens`.
 
 Use hovers for detailed values, qualifiers, completeness information, contributors, and mapping explanations. Consider inlay hints or decoration after-text only as optional compact presentations.
 

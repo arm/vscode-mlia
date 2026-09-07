@@ -42,7 +42,7 @@ See the [contributor guide](docs/contributors/README.md).
 
 ## Feedback and issues
 
-Report defects and feature requests through the repository's [issue tracker](https://github.com/Arm/mlia-vscode/issues).
+Report defects and feature requests through the repository's [issue tracker](https://github.com/Arm/vscode-mlia/issues).
 
 ## License
 

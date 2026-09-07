@@ -74,7 +74,7 @@ const autoOpenModelExplorerSetting = "autoOpenModelExplorer";
 const showCodeLensSetting = "showCodeLens";
 const showHeatmapSetting = "showHeatmap";
 const sourceNavigationBorderDurationMs = 1_500;
-const openCurrentModelExplorerCommandId = "mlia-vscode.openCurrentModelExplorer";
+const openCurrentModelExplorerCommandId = "vscode-mlia.openCurrentModelExplorer";
 const currentAnalysisCanOpenModelExplorerContext = "mlia.currentAnalysisCanOpenModelExplorer";
 const environmentRefreshingContext = "mlia.environmentRefreshing";
 const defaultAnalysisMode: MliaAnalysisMode = "estimation";
@@ -212,12 +212,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     isCodeLensEnabled: () => isSettingEnabled(showCodeLensSetting),
     isHeatmapEnabled: () => isSettingEnabled(showHeatmapSetting),
     openSettings: () => {
-      void vscode.commands.executeCommand("mlia-vscode.openSettings");
+      void vscode.commands.executeCommand("vscode-mlia.openSettings");
     },
     openSourceFileMap: () => {
       void vscode.commands.executeCommand(
         "workbench.action.openSettings",
-        "@id:mlia-vscode.sourceFileMap",
+        "@id:vscode-mlia.sourceFileMap",
       );
     },
     openSourceLocation: (location) => {
@@ -291,10 +291,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   };
   const newAnalysisProvider = new NewAnalysisViewProvider({
     refreshEnvironment: () => {
-      void vscode.commands.executeCommand("mlia-vscode.refreshPythonVenv");
+      void vscode.commands.executeCommand("vscode-mlia.refreshPythonVenv");
     },
     runAnalysis: (targetProfile, analysisMode, analysisOptions, analysisInputs) =>
-      void vscode.commands.executeCommand("mlia-vscode.checkPerformance", {
+      void vscode.commands.executeCommand("vscode-mlia.checkPerformance", {
         targetProfile,
         analysisMode,
         analysisOptions,
@@ -303,7 +303,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     showLog: () => outputChannel.show(true),
     selectTargetProfile: (targetProfile) => {
       void vscode.workspace
-        .getConfiguration("mlia-vscode")
+        .getConfiguration("vscode-mlia")
         .update(targetProfileSetting, targetProfile || undefined, vscode.ConfigurationTarget.Global);
     },
     selectAnalysisMode: (analysisMode) => {
@@ -325,7 +325,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           ),
         });
         void vscode.workspace
-          .getConfiguration("mlia-vscode")
+          .getConfiguration("vscode-mlia")
           .update(targetProfileSetting, selected, vscode.ConfigurationTarget.Global);
       }
     },
@@ -379,11 +379,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     decorationManager.updateVisibleEditors(editors);
   });
   const configurationChanged = vscode.workspace.onDidChangeConfiguration((event) => {
-    if (event.affectsConfiguration("mlia-vscode.sourceFileMap")) {
+    if (event.affectsConfiguration("vscode-mlia.sourceFileMap")) {
       sourceAnnotations.updateSourceFileMap(getSourceFileMap());
     }
     if (
-      event.affectsConfiguration("mlia-vscode.targetProfile") &&
+      event.affectsConfiguration("vscode-mlia.targetProfile") &&
       newAnalysisState.kind === "ready"
     ) {
       const selected = selectedTargetProfile(
@@ -402,8 +402,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       });
     }
     if (
-      event.affectsConfiguration(`mlia-vscode.${showCodeLensSetting}`) ||
-      event.affectsConfiguration(`mlia-vscode.${showHeatmapSetting}`)
+      event.affectsConfiguration(`vscode-mlia.${showCodeLensSetting}`) ||
+      event.affectsConfiguration(`vscode-mlia.${showHeatmapSetting}`)
     ) {
       currentAnalysisProvider.refresh();
     }
@@ -437,15 +437,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
   };
   const refreshPythonVenv = vscode.commands.registerCommand(
-    "mlia-vscode.refreshPythonVenv",
+    "vscode-mlia.refreshPythonVenv",
     () => runEnvironmentRefresh("refreshPythonVenv"),
   );
   const forceRefreshPythonVenv = vscode.commands.registerCommand(
-    "mlia-vscode.forceRefreshPythonVenv",
+    "vscode-mlia.forceRefreshPythonVenv",
     () => runEnvironmentRefresh("forceRefreshPythonVenv", true),
   );
   const showMliaInfoCommand = vscode.commands.registerCommand(
-    "mlia-vscode.showMliaInfo",
+    "vscode-mlia.showMliaInfo",
     () => {
       const detail = newAnalysisState.kind === "ready"
         ? `Version: ${newAnalysisState.version}`
@@ -454,8 +454,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     },
   );
   const openSettingsCommand = vscode.commands.registerCommand(
-    "mlia-vscode.openSettings",
-    () => vscode.commands.executeCommand("workbench.action.openSettings", "@ext:arm.mlia-vscode"),
+    "vscode-mlia.openSettings",
+    () => vscode.commands.executeCommand("workbench.action.openSettings", "@ext:arm.vscode-mlia"),
   );
   const openCurrentModelExplorerCommand = vscode.commands.registerCommand(
     openCurrentModelExplorerCommandId,
@@ -467,7 +467,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     },
   );
   const checkPerformanceCommand = vscode.commands.registerCommand(
-    "mlia-vscode.checkPerformance",
+    "vscode-mlia.checkPerformance",
     (options?: RunAnalysisCommandOptions) =>
       runLoggedCommand("checkPerformance", () =>
         checkPerformanceCommandHandler(
@@ -489,7 +489,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     (action?: SourceCodeLensAction) => executeSourceOverlayAction(sourceOverlayActions, action),
   );
   const cancelAnalysisCommand = vscode.commands.registerCommand(
-    "mlia-vscode.cancelAnalysis",
+    "vscode-mlia.cancelAnalysis",
     async (item: AnalysisTreeItem) => {
       if (!item?.analysis) {
         return;
@@ -502,7 +502,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     },
   );
   const deleteAnalysisCommand = vscode.commands.registerCommand(
-    "mlia-vscode.deleteAnalysis",
+    "vscode-mlia.deleteAnalysis",
     async (item: AnalysisTreeItem) => {
       if (!item?.analysis) {
         return;
@@ -518,7 +518,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     },
   );
   const openAnalysisFolderCommand = vscode.commands.registerCommand(
-    "mlia-vscode.openAnalysisFolder",
+    "vscode-mlia.openAnalysisFolder",
     async (item: AnalysisTreeItem) => {
       if (!item?.analysis) {
         return;
@@ -529,14 +529,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     },
   );
   const openAnalysesFolderCommand = vscode.commands.registerCommand(
-    "mlia-vscode.openAnalysesFolder",
+    "vscode-mlia.openAnalysesFolder",
     async () => {
       const analysesRoot = await analysisStore.ensureAnalysesRoot();
       await vscode.env.openExternal(vscode.Uri.file(analysesRoot));
     },
   );
   const clearAllAnalysesCommand = vscode.commands.registerCommand(
-    "mlia-vscode.clearAllAnalyses",
+    "vscode-mlia.clearAllAnalyses",
     () => clearAllAnalyses(analysisStore, panelManager),
   );
 
@@ -936,13 +936,13 @@ async function selectMappedEntity(
 
 function getSourceFileMap(): Record<string, string> {
   return vscode.workspace
-    .getConfiguration("mlia-vscode")
+    .getConfiguration("vscode-mlia")
     .get<Record<string, string>>("sourceFileMap", {});
 }
 
 function isSettingEnabled(setting: string): boolean {
   return vscode.workspace
-    .getConfiguration("mlia-vscode")
+    .getConfiguration("vscode-mlia")
     .get<boolean>(setting, true);
 }
 
@@ -967,19 +967,19 @@ function showMliaCheckPerformanceProgress(
 
 function getTargetProfile(): string | undefined {
   return vscode.workspace
-    .getConfiguration("mlia-vscode")
+    .getConfiguration("vscode-mlia")
     .get<string>(targetProfileSetting) || undefined;
 }
 
 function getConfigFileContents(): string {
   return vscode.workspace
-    .getConfiguration("mlia-vscode")
+    .getConfiguration("vscode-mlia")
     .get<string>(configFileContentsSetting, "");
 }
 
 function getExtraCommandLineArgs(): string[] {
   return vscode.workspace
-    .getConfiguration("mlia-vscode")
+    .getConfiguration("vscode-mlia")
     .get<string[]>(extraCommandLineArgsSetting, []);
 }
 

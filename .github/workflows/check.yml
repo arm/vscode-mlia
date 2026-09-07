@@ -14,7 +14,7 @@ jobs:
   lint-and-format:
     runs-on: ${{ vars.LINUX_RUNNER }}
     steps:
-      - name: Checkout MLIA for VS Code
+      - name: Checkout VS Code MLIA
         uses: actions/checkout@v5
         with:
           persist-credentials: false

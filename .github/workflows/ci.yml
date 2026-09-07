@@ -24,7 +24,7 @@ jobs:
       matrix:
         node-version: ["20", "22"]
     steps:
-      - name: Checkout MLIA for VS Code
+      - name: Checkout VS Code MLIA
         uses: actions/checkout@v5
         with:
           persist-credentials: false
@@ -47,7 +47,7 @@ jobs:
     needs: [tests]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout MLIA for VS Code
+      - name: Checkout VS Code MLIA
         uses: actions/checkout@v5
         with:
           persist-credentials: false
@@ -82,9 +82,9 @@ jobs:
           npm sbom --omit=dev --package-lock-only \
             --sbom-format cyclonedx \
             --sbom-type application \
-            > sbom/mlia-vscode.cdx.json
+            > sbom/vscode-mlia.cdx.json
           python scripts/add-sbom-disclaimer.py \
-            sbom/mlia-vscode.cdx.json
+            sbom/vscode-mlia.cdx.json
       - name: Upload SBOM artifacts
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
         with:
@@ -151,15 +151,15 @@ jobs:
     needs: [build]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout MLIA for VS Code
+      - name: Checkout VS Code MLIA
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
           persist-credentials: true
-      - name: Checkout public MLIA for VS Code
+      - name: Checkout public VS Code MLIA
         uses: actions/checkout@v5
         with:
-          repository: arm/mlia-vscode
+          repository: arm/vscode-mlia
           token: ${{ secrets.ARM_ORG_TOKEN }}
           path: target-repo
           persist-credentials: true
@@ -179,15 +179,15 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && github.repository_owner != 'arm'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout MLIA for VS Code
+      - name: Checkout VS Code MLIA
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
           persist-credentials: true
-      - name: Checkout public MLIA for VS Code
+      - name: Checkout public VS Code MLIA
         uses: actions/checkout@v5
         with:
-          repository: arm/mlia-vscode
+          repository: arm/vscode-mlia
           token: ${{ secrets.ARM_ORG_TOKEN }}
           path: target-repo
           persist-credentials: true

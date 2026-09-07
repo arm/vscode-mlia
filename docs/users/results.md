@@ -15,7 +15,7 @@ A completed analysis appears in three places:
 
 By default, the extension opens a Model Explorer panel when an analysis starts and replaces its loading view with the generated result when MLIA completes.
 
-Set [`mlia-vscode.autoOpenModelExplorer`](configuration.md#auto-open-model-explorer) to `false` if you do not want panels to open automatically. Completed runs are still saved. To open a saved result later, select its entry in **Analysis Runs**.
+Set [`vscode-mlia.autoOpenModelExplorer`](configuration.md#auto-open-model-explorer) to `false` if you do not want panels to open automatically. Completed runs are still saved. To open a saved result later, select its entry in **Analysis Runs**.
 
 ## Current Analysis Run
 
@@ -81,7 +81,7 @@ Overlay selections are saved with each run.
 
 ## Model Explorer and source navigation
 
-When [`mlia-vscode.syncModelExplorerSelectionToCode`](configuration.md#sync-model-explorer-selection-to-code) is enabled, selecting a mapped Model Explorer node opens its corresponding source location when one can be resolved unambiguously.
+When [`vscode-mlia.syncModelExplorerSelectionToCode`](configuration.md#sync-model-explorer-selection-to-code) is enabled, selecting a mapped Model Explorer node opens its corresponding source location when one can be resolved unambiguously.
 
 Source navigation works only when a selected node maps to one local file and line. The extension does not navigate when:
 

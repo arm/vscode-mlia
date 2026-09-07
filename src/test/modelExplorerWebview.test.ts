@@ -393,7 +393,7 @@ function runGeneratedHost(html: string) {
 
 async function writeArtifacts(standaloneHtml: string) {
   const root = await fs.mkdtemp(
-    path.join(os.tmpdir(), "mlia-vscode-webview-test-"),
+    path.join(os.tmpdir(), "vscode-mlia-webview-test-"),
   );
   tempDirs.push(root);
   const htmlPath = path.join(root, "model-explorer", "bundle", "index.html");
@@ -970,10 +970,10 @@ describe("openModelExplorerWebview", () => {
     assert.strictEqual(panel.webview.html.includes("Sync to code"), false);
     assert.match(
       panel.webview.html,
-      /<style id="mlia-vscode-model-explorer-styles">\s*body \{ padding: 0; \}\s*<\/style>/,
+      /<style id="vscode-mlia-model-explorer-styles">\s*body \{ padding: 0; \}\s*<\/style>/,
     );
     assert.ok(
-      panel.webview.html.indexOf("mlia-vscode-model-explorer-styles") <
+      panel.webview.html.indexOf("vscode-mlia-model-explorer-styles") <
         panel.webview.html.toLowerCase().indexOf("</head>"),
     );
     assert.match(panel.webview.html, /selectedNodeChanged/);

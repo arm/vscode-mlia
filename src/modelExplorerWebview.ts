@@ -747,7 +747,7 @@ function addVsCodeIntegration(
 }
 
 function addModelExplorerWebviewStyles(html: string): string {
-  const styles = `<style id="mlia-vscode-model-explorer-styles">
+  const styles = `<style id="vscode-mlia-model-explorer-styles">
     body { padding: 0; }
   </style>`;
   const headEnd = html.toLowerCase().lastIndexOf("</head>");
