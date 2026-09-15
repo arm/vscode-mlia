@@ -16,3 +16,4 @@ node_modules/**
 # Local Python runtime development overrides
 resources/python-runtime/.env
 resources/python-runtime/pyproject.dev.toml
+resources/python-runtime/compatibility-shim/**

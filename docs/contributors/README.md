@@ -30,6 +30,42 @@ The packaged extension uses `dist/extension.js` as its entry point. Source files
 
 The `F5` launch configuration runs the bundle task before opening the Extension Development Host.
 
+## Private VSIX releases
+
+The same extension supports public and private distributions. For a private
+release, populate `resources/python-runtime/wheelhouse/` with the selected
+private package wheels before running `npm run package:extension`. Omit this
+folder for the normal remote-index distribution. Wheels are ignored by Git but
+included in the VSIX; do not add the wheelhouse to `.vscodeignore`.
+
+On environment refresh, the extension detects this directory and adds it as the
+first uv flat index in the generated managed-runtime `pyproject.toml`. Under
+uv's default `first-index` policy, a package present in the wheelhouse must
+resolve from that wheelhouse. Packages absent from it resolve through the normal
+remote indexes, including PyPI. Subsequent uv commands use the same generated
+configuration. Refresh fingerprints the generated project and wheel contents,
+discarding the generated lockfile when those inputs change so a previously
+locked remote package cannot override a newly bundled one. Unchanged releases
+retain their lockfile. Changed inputs also reinstall an existing environment to
+pick up rebuilt wheels, and only a fully verified refresh records the inputs as
+successfully installed.
+
+Supply a mutually compatible package set, including private transitive
+dependencies and wheels for the supported Python version and host platform.
+Public dependencies, uv and Python may still be downloaded. Do not distribute
+credentials, editable source paths, `pyproject.dev.toml`, or compatibility
+shims. Use a clean packaging staging directory when local development overrides
+are present. An incompatible bundled package should fail resolution, not fall
+back silently to a public package of the same name.
+
+The real-uv integration test is opt-in. Supply an existing uv executable and a
+Python 3.12 interpreter; it builds tiny fixture wheels and serves a local HTTP
+index to test public/private switching, release updates, and conflict handling:
+
+```sh
+MLIA_TEST_UV=/path/to/uv MLIA_TEST_PYTHON=/path/to/python3.12 npm test
+```
+
 ## Design documentation
 
 Put technical decisions and investigations in the [design notes](../design/README.md).

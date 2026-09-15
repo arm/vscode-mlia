@@ -2,6 +2,7 @@ import * as assert from "assert";
 import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
+import { pathToFileURL } from "url";
 import { afterEach, describe, it } from "node:test";
 
 import {
@@ -174,6 +175,111 @@ describe("refreshPythonRuntime", () => {
     ]);
   });
 
+  it("puts the bundled flat index before development indexes and retains remote fallback", async () => {
+    const fixture = await makeFixture();
+    const resources = path.join(fixture.extensionPath, "resources", "python-runtime");
+    const wheelhouse = path.join(resources, "wheelhouse");
+    await fs.mkdir(wheelhouse);
+    const dev = '[[tool.uv.index]]\nname = "internal"\nurl = "https://example.invalid/simple"\n';
+    await fs.writeFile(path.join(resources, "pyproject.dev.toml"), dev);
+    const generated: string[] = [];
+    const logs: string[] = [];
+    const runCommand: CommandRunner = async (_command, args, cwd) => {
+      if (args[0] === "sync") {
+        generated.push(await fs.readFile(path.join(cwd, "pyproject.toml"), "utf8"));
+      }
+      return { stdout: args.includes("-c") ? "[]" : "MLIA test", stderr: "" };
+    };
+    const result = await refreshPythonRuntime({ ...fixture, runCommand, log: (text) => logs.push(text) });
+    assert.strictEqual(result.ok, true);
+    const base = await fs.readFile(path.join(resources, "pyproject.toml"), "utf8");
+    assert.deepStrictEqual(generated, [
+      '[[tool.uv.index]]\nname = "bundled"\nurl = ' + JSON.stringify(pathToFileURL(wheelhouse).href) +
+      '\nformat = "flat"\n\n' + base.trimEnd() + "\n\n" + dev.trim() + "\n",
+    ]);
+    assert.ok(logs.includes(`Using bundled Python wheelhouse: ${wheelhouse}`));
+  });
+
+  it("removes the bundled index when refreshing a public distribution in the same storage", async () => {
+    const fixture = await makeFixture();
+    const resources = path.join(fixture.extensionPath, "resources", "python-runtime");
+    const wheelhouse = path.join(resources, "wheelhouse");
+    await fs.mkdir(wheelhouse);
+    const runCommand: CommandRunner = async (_command, args) => ({
+      stdout: args.includes("-c") ? "[]" : "MLIA test", stderr: "",
+    });
+    assert.strictEqual((await refreshPythonRuntime({ ...fixture, runCommand })).ok, true);
+    await fs.rmdir(wheelhouse);
+    assert.strictEqual((await refreshPythonRuntime({ ...fixture, runCommand })).ok, true);
+    assert.strictEqual(
+      await fs.readFile(path.join(fixture.globalStoragePath, "python", "pyproject.toml"), "utf8"),
+      await fs.readFile(path.join(resources, "pyproject.toml"), "utf8"),
+    );
+  });
+
+  it("encodes spaces and URL-sensitive characters in the wheelhouse location", async () => {
+    const fixture = await makeFixture();
+    const extensionPath = fixture.extensionPath + " space # café";
+    await fs.rename(fixture.extensionPath, extensionPath);
+    const resources = path.join(extensionPath, "resources", "python-runtime");
+    const wheelhouse = path.join(resources, "wheelhouse");
+    await fs.mkdir(wheelhouse);
+    const result = await refreshPythonRuntime({ ...fixture, extensionPath, runCommand: async (_command, args) => ({
+      stdout: args.includes("-c") ? "[]" : "MLIA test", stderr: "",
+    }) });
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(
+      await fs.readFile(path.join(fixture.globalStoragePath, "python", "pyproject.toml"), "utf8"),
+      '[[tool.uv.index]]\nname = "bundled"\nurl = ' + JSON.stringify(pathToFileURL(wheelhouse).href) +
+      '\nformat = "flat"\n\n' + await fs.readFile(path.join(resources, "pyproject.toml"), "utf8"),
+    );
+  });
+
+  it("fails before running uv when the wheelhouse path is not a directory", async () => {
+    const fixture = await makeFixture();
+    await fs.writeFile(path.join(fixture.extensionPath, "resources", "python-runtime", "wheelhouse"), "not a directory");
+    let calls = 0;
+    const result = await refreshPythonRuntime({ ...fixture, runCommand: async () => {
+      calls += 1;
+      return { stdout: "", stderr: "" };
+    } });
+    assert.strictEqual(result.ok, false);
+    if (!result.ok) {
+      assert.strictEqual(result.stage, "prepare");
+      assert.match(result.message, /wheelhouse is not a directory/);
+    }
+    assert.strictEqual(calls, 0);
+  });
+
+  it("invalidates the lock only when the generated project or bundled wheel contents change", async () => {
+    const fixture = await makeFixture();
+    const resources = path.join(fixture.extensionPath, "resources", "python-runtime");
+    const wheelhouse = path.join(resources, "wheelhouse");
+    await fs.mkdir(wheelhouse);
+    const wheel = path.join(wheelhouse, "mlia-1.0.0-py3-none-any.whl");
+    await fs.writeFile(wheel, "first wheel content");
+    const retained: boolean[] = [];
+    const runCommand: CommandRunner = async (_command, args, cwd) => {
+      if (args[0] === "sync") {
+        const lock = path.join(cwd, "uv.lock");
+        retained.push(await fs.stat(lock).then(() => true, () => false));
+        await fs.writeFile(lock, "test-generated lock");
+      }
+      return { stdout: args.includes("-c") ? "[]" : "MLIA test", stderr: "" };
+    };
+    const refresh = async () => assert.strictEqual((await refreshPythonRuntime({ ...fixture, runCommand })).ok, true);
+    await refresh();
+    await refresh();
+    await fs.writeFile(wheel, "other wheel content");
+    await refresh();
+    await fs.rm(wheelhouse, { recursive: true });
+    await refresh();
+    await refresh();
+    await fs.appendFile(path.join(resources, "pyproject.toml"), "# release change\n");
+    await refresh();
+    assert.deepStrictEqual(retained, [false, true, false, false, true, false]);
+  });
+
   it("reuses an existing venv", async () => {
     const fixture = await makeFixture();
     await fs.mkdir(path.join(fixture.globalStoragePath, "python", ".venv"), { recursive: true });
@@ -193,7 +299,7 @@ describe("refreshPythonRuntime", () => {
 
     assert.strictEqual(result.ok, true);
     assert.deepStrictEqual(calls, [
-      "uv sync",
+      "uv sync --reinstall",
       "uv run mlia --version",
       "uv run python -c import json; from mlia.api import list_targets; print(json.dumps(list_targets()))",
     ]);

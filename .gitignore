@@ -12,6 +12,9 @@ dist/
 # Packaged extensions
 *.vsix
 
+# Private release artifacts (populated before VSIX packaging)
+resources/python-runtime/wheelhouse/
+
 # Local Python runtime development overrides
 resources/python-runtime/pyproject.dev.toml
 resources/python-runtime/.env

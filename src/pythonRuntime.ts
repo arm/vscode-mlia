@@ -1,13 +1,17 @@
 import * as childProcess from "child_process";
+import { createHash } from "crypto";
 import * as fsSync from "fs";
 import * as fs from "fs/promises";
 import * as path from "path";
+import { pathToFileURL } from "url";
 
 import {
   ensureManagedUv,
   getManagedUvPath,
   managedUvEnvironment,
 } from "./uvBootstrap";
+
+const runtimeInputsFileName = "runtime-inputs.sha256";
 
 export interface CommandResult {
   stdout: string;
@@ -189,9 +193,10 @@ export async function refreshPythonRuntime(
       ...await readRuntimeEnv(options.extensionPath, options),
       ...managedUvEnvironment(options.globalStoragePath),
     };
-    await writeRuntimePyproject(options.extensionPath, runtimeDir, options);
+    const runtimeInputs = await writeRuntimePyproject(options.extensionPath, runtimeDir, options);
+    const hasVenv = await pathExists(venvDir);
 
-    if (!(await pathExists(venvDir))) {
+    if (!hasVenv) {
       stage = "createVenv";
       progress(options, "Creating venv");
       await runRuntimeCommand(runCommand, uvExecutable, ["venv", venvDir], runtimeDir, options, runtimeEnv);
@@ -202,10 +207,9 @@ export async function refreshPythonRuntime(
     stage = "sync";
     progress(options, "Installing MLIA packages");
     const syncArgs = ["sync"];
-    if (options.forceRecreateVenv) {
-      // Recreating the venv does not clear uv's managed cache. Force a rebuild
-      // so editable wheels, build hooks, and bundled artifacts cannot be
-      // restored from stale cached package builds during a force refresh.
+    if (options.forceRecreateVenv || (runtimeInputs.changed && hasVenv)) {
+      // Reinstall also refreshes uv's cache. This covers both force refreshes
+      // and changed release inputs, including rebuilt same-version wheels.
       syncArgs.push("--reinstall");
     }
     await runRuntimeCommand(runCommand, uvExecutable, syncArgs, runtimeDir, options, runtimeEnv);
@@ -217,6 +221,7 @@ export async function refreshPythonRuntime(
     stage = "queryTargets";
     progress(options, "Querying MLIA target profiles");
     const targets = await queryMliaTargets(runtimeDir, uvExecutable, runCommand, options, runtimeEnv);
+    await fs.writeFile(path.join(runtimeDir, runtimeInputsFileName), runtimeInputs.fingerprint, "utf8");
     const targetProfiles = targets.flatMap(({ profiles }) => profiles);
     log(options, `Found ${targetProfiles.length} MLIA target profile(s): ${targetProfiles.join(", ")}`);
 
@@ -443,7 +448,7 @@ async function writeRuntimePyproject(
   extensionPath: string,
   runtimeDir: string,
   options: RefreshPythonRuntimeOptions,
-): Promise<void> {
+): Promise<{ fingerprint: string; changed: boolean }> {
   const pythonRuntimeResourceDir = path.join(extensionPath, "resources", "python-runtime");
   const basePath = path.join(pythonRuntimeResourceDir, "pyproject.toml");
   const devPath = path.join(pythonRuntimeResourceDir, "pyproject.dev.toml");
@@ -463,7 +468,73 @@ async function writeRuntimePyproject(
     log(options, "No runtime development pyproject found");
   }
 
+  const wheelhousePath = path.join(pythonRuntimeResourceDir, "wheelhouse");
+  let hasWheelhouse = false;
+  try {
+    const stat = await fs.stat(wheelhousePath);
+    if (!stat.isDirectory()) {
+      throw new Error(`Bundled Python wheelhouse is not a directory: ${wheelhousePath}`);
+    }
+    hasWheelhouse = true;
+  } catch (error) {
+    if (!isFileNotFoundError(error)) {
+      throw error;
+    }
+  }
+
+  const inputHash = createHash("sha256");
+  if (hasWheelhouse) {
+    // Hash actual wheel contents, not just names: replacing a same-version test
+    // wheel must not leave uv using an earlier cached lockfile selection.
+    const wheels = (await fs.readdir(wheelhousePath)).filter((file) => file.endsWith(".whl")).sort();
+    for (const wheel of wheels) {
+      const wheelHash = createHash("sha256");
+      for await (const chunk of fsSync.createReadStream(path.join(wheelhousePath, wheel))) {
+        wheelHash.update(chunk);
+      }
+      inputHash.update(JSON.stringify([wheel, wheelHash.digest("hex")]));
+    }
+
+    // A flat index participates in uv's first-index policy. Unlike a default
+    // index, it leaves PyPI available for packages not included in the release.
+    // Prepend it so development indexes cannot take precedence over the bundle.
+    const index = [
+      "[[tool.uv.index]]",
+      'name = "bundled"',
+      `url = ${JSON.stringify(pathToFileURL(wheelhousePath).href)}`,
+      'format = "flat"',
+      "",
+      "",
+    ].join("\n");
+    content = index + content;
+    log(options, `Using bundled Python wheelhouse: ${wheelhousePath}`);
+  } else {
+    log(options, "No bundled Python wheelhouse; using configured remote indexes");
+  }
+
+  const fingerprint = inputHash.update(content).digest("hex");
+  const fingerprintPath = path.join(runtimeDir, runtimeInputsFileName);
+  let previousFingerprint: string | undefined;
+  try {
+    previousFingerprint = await fs.readFile(fingerprintPath, "utf8");
+  } catch (error) {
+    if (!isFileNotFoundError(error)) {
+      throw error;
+    }
+  }
+  const changed = previousFingerprint !== fingerprint;
+  if (changed) {
+    // uv can retain a locked remote selection after a higher-priority index is
+    // added. Re-resolve when release inputs change, but retain the lock on an
+    // ordinary refresh of the same release.
+    // Remove the success stamp before changing anything. A failed refresh,
+    // even followed by a rollback to older inputs, must retry the reinstall.
+    await fs.rm(fingerprintPath, { force: true });
+    await fs.rm(path.join(runtimeDir, "uv.lock"), { force: true });
+    log(options, "Runtime package inputs changed; discarding generated uv.lock");
+  }
   await fs.writeFile(destinationPath, content, "utf8");
+  return { fingerprint, changed };
 }
 
 async function queryMliaTargets(
