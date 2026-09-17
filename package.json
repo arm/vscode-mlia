@@ -248,10 +248,16 @@
   "devDependencies": {
     "@types/node": "^22.15.0",
     "@types/vscode": "^1.100.0",
+    "@types/yauzl": "^3.4.0",
     "@vscode/vsce": "^3.9.2",
     "esbuild": "^0.28.2",
-    "extract-zip": "^2.0.1",
     "tar": "^7.5.22",
-    "typescript": "^5.8.0"
+    "typescript": "^5.8.0",
+    "yauzl": "^3.4.0"
+  },
+  "overrides": {
+    "fast-uri": "4.1.5",
+    "js-yaml": "5.4.2",
+    "qs": "6.16.0"
   }
 }

@@ -4,8 +4,8 @@ import * as fs from "fs/promises";
 import * as https from "https";
 import * as path from "path";
 import { pipeline } from "stream/promises";
-import extractZip = require("extract-zip");
 import { x as extractTar } from "tar";
+import * as yauzl from "yauzl";
 
 export const managedUvVersion = "0.11.32";
 export const managedUvChecksumManifestSha256 =
@@ -350,10 +350,86 @@ async function extractArchive(
   kind: UvArchiveKind,
 ): Promise<void> {
   if (kind === "zip") {
-    await extractZip(archivePath, { dir: destination });
+    await extractZipArchive(archivePath, destination);
     return;
   }
   await extractTar({ file: archivePath, cwd: destination, gzip: true });
+}
+
+async function extractZipArchive(archivePath: string, destination: string): Promise<void> {
+  const destinationRoot = path.resolve(destination);
+  const zipFile = await openZipFile(archivePath);
+  try {
+    await new Promise<void>((resolve, reject) => {
+      zipFile.once("error", reject);
+      zipFile.once("end", resolve);
+      zipFile.on("entry", (entry: yauzl.Entry) => {
+        handleZipEntry(zipFile, entry, destinationRoot).then(
+          () => zipFile.readEntry(),
+          reject,
+        );
+      });
+      zipFile.readEntry();
+    });
+  } finally {
+    zipFile.close();
+  }
+}
+
+function openZipFile(archivePath: string): Promise<yauzl.ZipFile> {
+  return new Promise((resolve, reject) => {
+    yauzl.open(archivePath, { lazyEntries: true }, (error, zipFile) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      if (!zipFile) {
+        reject(new Error(`Failed to open zip archive: ${archivePath}`));
+        return;
+      }
+      resolve(zipFile);
+    });
+  });
+}
+
+async function handleZipEntry(
+  zipFile: yauzl.ZipFile,
+  entry: yauzl.Entry,
+  destinationRoot: string,
+): Promise<void> {
+  const entryPath = path.resolve(destinationRoot, entry.fileName);
+  const relativePath = path.relative(destinationRoot, entryPath);
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+    throw new Error(`Zip archive entry escapes destination: ${entry.fileName}`);
+  }
+
+  if (entry.fileName.endsWith("/")) {
+    await fs.mkdir(entryPath, { recursive: true });
+    return;
+  }
+
+  await fs.mkdir(path.dirname(entryPath), { recursive: true });
+  const readStream = await openZipReadStream(zipFile, entry);
+  await pipeline(readStream, createWriteStream(entryPath, { flags: "wx" }));
+}
+
+function openZipReadStream(
+  zipFile: yauzl.ZipFile,
+  entry: yauzl.Entry,
+): Promise<NodeJS.ReadableStream> {
+  return new Promise((resolve, reject) => {
+    zipFile.openReadStream(entry, (error, readStream) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      if (!readStream) {
+        reject(new Error(`Failed to read zip archive entry: ${entry.fileName}`));
+        return;
+      }
+      resolve(readStream);
+    });
+  });
 }
 
 async function fileSha256(filePath: string): Promise<string> {

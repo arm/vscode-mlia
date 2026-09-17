@@ -32,13 +32,14 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
-          cache: npm
+          package-manager-cache: false
       - name: Install dependencies
         run: npm ci --ignore-scripts --prefer-offline --no-audit --fund=false
       - name: Set up uv
         uses: astral-sh/setup-uv@v8.3.2
         with:
           version: "0.11.32"
+          enable-cache: false
       - name: Run tests
         run: npm test
 
@@ -55,7 +56,7 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: "22"
-          cache: npm
+          package-manager-cache: false
       - name: Install dependencies
         run: npm ci --ignore-scripts --prefer-offline --no-audit --fund=false
       - name: Set up Python
@@ -66,6 +67,7 @@ jobs:
         uses: astral-sh/setup-uv@v8.3.2
         with:
           version: "0.11.32"
+          enable-cache: false
       - name: Check TypeScript
         run: npm run lint
       - name: Package extension
@@ -140,6 +142,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: "22"
+          package-manager-cache: false
       - name: Publish to VS Code Marketplace
         if: github.repository_owner == 'arm'
         run: npx --yes @vscode/vsce@3.9.2 publish --skip-duplicate -i artifacts/vsix/*.vsix -p "${VS_MARKETPLACE_TOKEN}" ${PRE_RELEASE_FLAG}
