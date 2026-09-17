@@ -15,8 +15,9 @@ permissions:
 jobs:
   checks:
     if: ${{ github.event.repository.private }}
-    uses: Arm-Debug/ai-debug-workflows/.github/workflows/internal-checks.yml@main
+    uses: Arm-Debug/ai-debug-workflows/.github/workflows/internal-checks.yml@d4b3e0e95cece1829f1b343bf797ee8f5f9299ed # main
     with:
       internal_scan: true
       internal_review: true
-    secrets: inherit
+    secrets:
+      BLACKDUCK_API_TOKEN: ${{ secrets.BLACKDUCK_API_TOKEN }}
