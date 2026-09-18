@@ -708,7 +708,7 @@ export class AnalysisStore {
       realAnalysisDir,
     );
     return {
-      artifacts: realArtifacts,
+      artifacts: absolute,
       standardizedOutput,
       entityNodeMappings,
       modelExplorerOverlayCatalog,
