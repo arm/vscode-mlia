@@ -2,7 +2,7 @@
   "name": "vscode-mlia",
   "displayName": "MLIA",
   "description": "Run MLIA performance analyses and explore model results in Visual Studio Code.",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "Arm",
   "license": "SEE LICENSE IN LICENSE",
   "private": true,
