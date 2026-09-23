@@ -5,10 +5,29 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "ethos-u-vela",
     "mlia",
+    # Make conversion available without relying on a partner metapackage.
+    "mlia-converters-pytorch",
+    "mlia-converters-litert",
     "mlia-ethos-u",
     "mlia-neural-technology",
     "mlia-model-explorer[vgf,onnx]",
+    # Declare Torch directly so this runtime can select its package index.
+    # The converter dependency supplies the compatible version constraint.
+    "torch",
 ]
+
+# The converter's published wheel requires Torch but does not carry its uv
+# CPU-index configuration. Select CPU-only Torch here to avoid downloading
+# CUDA libraries for CPU-based conversion. This affects only the extension's
+# managed environment; other packages keep their normal indexes.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+# Leave the parent sources table implicit so pyproject.dev.toml can add sources.
+[tool.uv.sources.torch]
+index = "pytorch-cpu"
 
 # Local development overrides:
 # Create a pyproject.dev.toml next to this file to append extra
