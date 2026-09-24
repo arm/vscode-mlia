@@ -15,6 +15,7 @@ const manifest = JSON.parse(
   main: string;
   scripts: Record<string, string>;
   dependencies?: Record<string, string>;
+  devDependencies: Record<string, string>;
   activationEvents: string[];
   contributes: {
     views: { mlia: Array<{ id: string; name: string; initialSize?: number }> };
@@ -38,10 +39,15 @@ function action(command: string): MenuContribution | undefined {
 }
 
 describe("extension packaging", () => {
-  it("uses the bundled extension entry point without runtime npm dependencies", () => {
+  it("bundles runtime dependencies without packaging node_modules", () => {
     assert.strictEqual(manifest.main, "./dist/extension.js");
     assert.strictEqual(manifest.scripts["vscode:prepublish"], "npm run bundle");
-    assert.strictEqual(manifest.dependencies, undefined);
+    assert.deepStrictEqual(Object.keys(manifest.dependencies ?? {}).sort(), ["tar", "yauzl"]);
+    for (const name of ["tar", "yauzl"]) {
+      assert.strictEqual(manifest.devDependencies[name], undefined);
+    }
+    assert.strictEqual(manifest.scripts.package, "vsce package --no-dependencies");
+    assert.strictEqual(manifest.scripts["package:extension"], "vsce package --no-dependencies");
   });
 });
 

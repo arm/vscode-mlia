@@ -6,6 +6,8 @@
 src/**
 docs/**
 tsconfig.json
+eslint.config.cjs
+.npmrc
 .gitignore
 
 # Development and debug build output

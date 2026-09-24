@@ -7,13 +7,13 @@ SPDX-License-Identifier: Apache-2.0
 
 ## Requirements
 
-- Node.js 20 or newer.
+- Node.js matching `^20.19.0 || ^22.13.0 || >=24` (required by ESLint).
 - Visual Studio Code 1.100 or newer.
 
 ## Development workflow
 
 1. Install dependencies with `npm install`.
-2. Type-check and compile the test build with `npm run compile`.
+2. Type-check and check dependency imports with `npm run lint`.
 3. Build the bundled extension entry point with `npm run bundle`.
 4. Run the test suite with `npm test`.
 5. Open the repository in VS Code and press `F5` to bundle and launch an Extension Development Host.
@@ -23,12 +23,28 @@ SPDX-License-Identifier: Apache-2.0
 The project has separate outputs for testing and distribution:
 
 - `npm run compile` uses TypeScript to emit modules and tests into `out/`. The test suite runs these files directly.
-- `npm run bundle` uses esbuild to combine the extension and its runtime dependencies into `dist/extension.js`.
+- `npm run bundle` checks dependency imports, then uses esbuild to combine the extension and its runtime dependencies into `dist/extension.js`.
 - `npm run package:extension` runs the bundle step and creates the distributable VSIX.
 
 The packaged extension uses `dist/extension.js` as its entry point. Source files, test output, source maps, and `node_modules` are excluded from the VSIX. Dependencies are still installed normally in `node_modules` for local development; bundling only changes the release artifact.
 
 The `F5` launch configuration runs the bundle task before opening the Extension Development Host.
+
+## Dependency imports
+
+`npm run lint:dependencies` uses ESLint and `eslint-plugin-import-x` to check
+imports against `package.json`. Runtime value imports must be declared in
+`dependencies`; an installed transitive package is not a substitute for a
+direct declaration. Tests, build scripts and the lint configuration may use
+`devDependencies`. Node built-ins and the VS Code host module are allowed, and
+erased type-only imports may use development dependencies.
+
+The check also runs through `npm run lint` and before bundling, so normal local
+packaging, F5 builds and CI reject undeclared or development-only runtime
+imports. It checks project source, not third-party libraries' internals or
+arbitrary computed runtime imports. The regression suite exercises the real
+rules and verifies that the actual bundle command fails when a runtime package
+is moved to `devDependencies`, then succeeds when its declaration is restored.
 
 ## Private VSIX releases
 

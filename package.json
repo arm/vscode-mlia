@@ -239,21 +239,28 @@
     "vscode:prepublish": "npm run bundle",
     "package": "vsce package --no-dependencies",
     "package:extension": "vsce package --no-dependencies",
-    "lint": "npm run compile",
-    "bundle": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --sourcemap --outfile=dist/extension.js",
+    "lint": "npm run compile && npm run lint:dependencies",
+    "lint:dependencies": "eslint . --max-warnings 0",
+    "bundle": "npm run lint:dependencies && esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --sourcemap --outfile=dist/extension.js",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "test": "npm run compile && node --test out/test/analysisActivation.test.js out/test/analysisInputs.test.js out/test/analysisLifecycle.test.js out/test/analysisPanels.test.js out/test/analysisStore.test.js out/test/checkPerformance.test.js out/test/currentAnalysisView.test.js out/test/environmentState.test.js out/test/extensionManifest.test.js out/test/newAnalysisView.test.js out/test/modelExplorerWebview.test.js out/test/overlayCatalog.test.js out/test/overlaySynchronization.test.js out/test/pythonRuntime.test.js out/test/pythonRuntime.wheelhouse.integration.test.js out/test/sourceCodeLens.test.js out/test/sourceDecorations.test.js out/test/sourceLines.test.js out/test/sourceNavigation.test.js out/test/sourceOverlayActions.test.js out/test/uvBootstrap.test.js out/test/watchdog.test.js"
+    "test": "npm run compile && node --test out/test/analysisActivation.test.js out/test/analysisInputs.test.js out/test/analysisLifecycle.test.js out/test/analysisPanels.test.js out/test/analysisStore.test.js out/test/checkPerformance.test.js out/test/currentAnalysisView.test.js out/test/dependencyImports.test.js out/test/environmentState.test.js out/test/extensionManifest.test.js out/test/newAnalysisView.test.js out/test/modelExplorerWebview.test.js out/test/overlayCatalog.test.js out/test/overlaySynchronization.test.js out/test/pythonRuntime.test.js out/test/pythonRuntime.wheelhouse.integration.test.js out/test/sourceCodeLens.test.js out/test/sourceDecorations.test.js out/test/sourceLines.test.js out/test/sourceNavigation.test.js out/test/sourceOverlayActions.test.js out/test/uvBootstrap.test.js out/test/watchdog.test.js"
+  },
+  "dependencies": {
+    "tar": "^7.5.22",
+    "yauzl": "^3.4.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
     "@types/vscode": "^1.100.0",
     "@types/yauzl": "^3.4.0",
+    "@typescript-eslint/parser": "^8.70.1",
     "@vscode/vsce": "^3.9.2",
     "esbuild": "^0.28.2",
-    "tar": "^7.5.22",
-    "typescript": "^5.8.0",
-    "yauzl": "^3.4.0"
+    "eslint": "^10.11.0",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-import-x": "^4.17.1",
+    "typescript": "^5.8.0"
   },
   "overrides": {
     "fast-uri": "4.1.5",
