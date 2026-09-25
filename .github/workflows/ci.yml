@@ -25,7 +25,7 @@ jobs:
         node-version: ["20", "22"]
     steps:
       - name: Checkout VS Code MLIA
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Set up Node.js
@@ -48,7 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout VS Code MLIA
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Set up Node.js
@@ -155,12 +155,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout VS Code MLIA
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: true
       - name: Checkout public VS Code MLIA
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: arm/vscode-mlia
           token: ${{ secrets.ARM_ORG_TOKEN }}
@@ -183,12 +183,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout VS Code MLIA
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: true
       - name: Checkout public VS Code MLIA
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: arm/vscode-mlia
           token: ${{ secrets.ARM_ORG_TOKEN }}
