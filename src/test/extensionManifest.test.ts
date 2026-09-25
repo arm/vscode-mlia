@@ -42,10 +42,8 @@ describe("extension packaging", () => {
   it("bundles runtime dependencies without packaging node_modules", () => {
     assert.strictEqual(manifest.main, "./dist/extension.js");
     assert.strictEqual(manifest.scripts["vscode:prepublish"], "npm run bundle");
-    assert.deepStrictEqual(Object.keys(manifest.dependencies ?? {}).sort(), ["tar", "yauzl"]);
-    for (const name of ["tar", "yauzl"]) {
-      assert.strictEqual(manifest.devDependencies[name], undefined);
-    }
+    assert.deepStrictEqual(Object.keys(manifest.dependencies ?? {}).sort(), ["yauzl"]);
+    assert.strictEqual(manifest.devDependencies.yauzl, undefined);
     assert.strictEqual(manifest.scripts.package, "vsce package --no-dependencies");
     assert.strictEqual(manifest.scripts["package:extension"], "vsce package --no-dependencies");
   });

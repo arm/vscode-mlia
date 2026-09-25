@@ -108,11 +108,11 @@ it("the actual bundle command blocks a misclassified runtime package and succeed
     linked = true;
     await fs.writeFile(path.join(root, "eslint.config.cjs"), `module.exports = require(${JSON.stringify(configPath)});\n`);
     await fs.mkdir(path.join(root, "src"));
-    await fs.writeFile(path.join(root, "src/extension.ts"), 'export { x } from "tar";\n');
+    await fs.writeFile(path.join(root, "src/extension.ts"), 'export { open } from "yauzl";\n');
     const manifest = JSON.parse(await fs.readFile(path.join(projectRoot, "package.json"), "utf8"));
-    const tarVersion = manifest.dependencies.tar;
-    delete manifest.dependencies.tar;
-    manifest.devDependencies.tar = tarVersion;
+    const yauzlVersion = manifest.dependencies.yauzl;
+    delete manifest.dependencies.yauzl;
+    manifest.devDependencies.yauzl = yauzlVersion;
     await fs.writeFile(path.join(root, "package.json"), JSON.stringify(manifest));
 
     const bundle = () => {
@@ -130,14 +130,14 @@ it("the actual bundle command blocks a misclassified runtime package and succeed
     assert.match(rejected.stdout + rejected.stderr, /import-x\/no-extraneous-dependencies/);
     await assert.rejects(fs.stat(path.join(root, "dist/extension.js")), { code: "ENOENT" });
 
-    manifest.dependencies.tar = tarVersion;
-    delete manifest.devDependencies.tar;
+    manifest.dependencies.yauzl = yauzlVersion;
+    delete manifest.devDependencies.yauzl;
     await fs.writeFile(path.join(root, "package.json"), JSON.stringify(manifest));
     const accepted = bundle();
     assert.ifError(accepted.error);
     assert.equal(accepted.status, 0, accepted.stdout + accepted.stderr);
     const built = require(path.join(root, "dist/extension.js"));
-    assert.equal(typeof built.x, "function");
+    assert.equal(typeof built.open, "function");
   } finally {
     if (linked) await fs.unlink(modules);
     await fs.rm(root, { recursive: true, force: true });

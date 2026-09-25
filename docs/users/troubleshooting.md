@@ -11,17 +11,17 @@ The log records managed-environment commands, analysis commands, MLIA output, ge
 
 ## The managed `uv` download fails
 
-The extension downloads a pinned `uv` release into VS Code global storage; no system installation is required.
+The extension downloads a pinned `uv` wheel from PyPI's file host and extracts its native executable into VS Code global storage. No system installation of uv, Python, pip, or an archive-extraction command is required for this step.
 
 If the download or checksum verification fails:
 
-1. Confirm that GitHub release downloads are reachable from your network.
+1. Confirm that `files.pythonhosted.org` is reachable from your network.
 2. Check proxy, certificate, firewall, and endpoint-security policies.
 3. Ensure the VS Code global-storage location is writable and has sufficient free space.
 4. Select **Refresh MLIA Environment** from the New Analysis title bar again.
 5. Use **MLIA: Force Refresh MLIA Environment** to redownload `uv` and recreate the Python environment.
 
-The extension refuses to continue if the checksum manifest does not match the hash pinned in the extension, or if the downloaded platform archive does not match the hash in the verified manifest.
+The extension refuses to extract the wheel if its SHA-256 does not match the platform-specific hash pinned in the extension.
 
 ## Environment refresh fails
 

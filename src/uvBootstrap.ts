@@ -4,20 +4,17 @@ import * as fs from "fs/promises";
 import * as https from "https";
 import * as path from "path";
 import { pipeline } from "stream/promises";
-import { x as extractTar } from "tar";
 import * as yauzl from "yauzl";
 
 export const managedUvVersion = "0.11.32";
-export const managedUvChecksumManifestSha256 =
-  "459439f17ac1aee2aa91ef423bf2b23fe0f7d99dbc1b84f9983ef1fc3af3371e";
 
 export type LinuxLibc = "gnu" | "musl";
-export type UvArchiveKind = "tar.gz" | "zip";
 
 export interface UvAsset {
   readonly target: string;
-  readonly archiveName: string;
-  readonly archiveKind: UvArchiveKind;
+  readonly wheelName: string;
+  readonly downloadUrl: string;
+  readonly sha256: string;
 }
 
 export interface EnsureManagedUvOptions {
@@ -27,63 +24,71 @@ export interface EnsureManagedUvOptions {
   readonly arch?: string;
   readonly linuxLibc?: LinuxLibc;
   readonly asset?: UvAsset;
-  readonly checksumManifestSha256?: string;
   readonly download?: (url: string, destination: string) => Promise<void>;
-  readonly extract?: (
-    archivePath: string,
-    destination: string,
-    kind: UvArchiveKind,
-  ) => Promise<void>;
   readonly log?: (message: string) => void;
   readonly progress?: (message: string) => void;
 }
 
 interface UvInstallMetadata {
   readonly version: string;
-  readonly archiveName: string;
-  readonly checksumManifestSha256: string;
-  readonly archiveSha256: string;
+  readonly wheelName: string;
+  readonly wheelSha256: string;
 }
 
-const releaseBaseUrl = `https://github.com/astral-sh/uv/releases/download/${managedUvVersion}`;
+interface WheelPin {
+  readonly tag: string;
+  readonly packagePath: string;
+  readonly sha256: string;
+}
+
 const installPromises = new Map<string, Promise<string>>();
 
-const assets: Readonly<Record<string, Omit<UvAsset, "target">>> = {
+// PyPI's uv 0.11.32 wheels contain standalone binaries. Pin the files and hashes
+// from https://pypi.org/pypi/uv/0.11.32/json; do not resolve packages at runtime.
+// This statically linked aarch64 wheel supports both glibc and musl hosts.
+const linuxArm64Wheel: WheelPin = {
+  tag: "manylinux_2_17_aarch64.manylinux2014_aarch64.musllinux_1_1_aarch64",
+  packagePath: "5d/61/0d6a8ee5066385fce65a5ef57939b1f63e9ff955afa07fa423c3e7e0abdb",
+  sha256: "125c142363d0842c8506a057da56bae182e2aa3957344f57dd9ef20ea10f06b0",
+};
+
+const wheels: Readonly<Record<string, WheelPin>> = {
   "aarch64-apple-darwin": {
-    archiveName: "uv-aarch64-apple-darwin.tar.gz",
-    archiveKind: "tar.gz",
+    tag: "macosx_11_0_arm64",
+    packagePath: "60/43/ec2de11ef008e76a8d01c34d573c939c565694f72c0d008d200aa3a5eac3",
+    sha256: "2a56d1abf16337350e878b2c869b256b8448ecc4a722b98f8d41e1b3680a587b",
   },
   "x86_64-apple-darwin": {
-    archiveName: "uv-x86_64-apple-darwin.tar.gz",
-    archiveKind: "tar.gz",
+    tag: "macosx_10_12_x86_64",
+    packagePath: "12/85/ef4d0f02f469cfad1d73c11bf31ac0a8f24da3c62d7f3305c50a5e51e814",
+    sha256: "c82954b1bd507e767b1d996c2865ea3eb7d464a479ec0e4d60f0b8e2e07dee45",
   },
   "aarch64-pc-windows-msvc": {
-    archiveName: "uv-aarch64-pc-windows-msvc.zip",
-    archiveKind: "zip",
+    tag: "win_arm64",
+    packagePath: "13/68/efb90a3e46c9f93e577b34e82467f232308a0ff3b12f807226caca6f72e2",
+    sha256: "bf988bf510772785eac1edfc7cdedca074e8936b45e755b58f7f3e1e9ca86424",
   },
   "i686-pc-windows-msvc": {
-    archiveName: "uv-i686-pc-windows-msvc.zip",
-    archiveKind: "zip",
+    tag: "win32",
+    packagePath: "00/f8/1f7cf58780bb1c5d6ea89126438971d8e61ad04d290e1c34ce1e8b136a83",
+    sha256: "bb1ae8189e315499a77f3cc27cac5985ab1d8cb79baa82e368b6c1e574a7d9cf",
   },
   "x86_64-pc-windows-msvc": {
-    archiveName: "uv-x86_64-pc-windows-msvc.zip",
-    archiveKind: "zip",
+    tag: "win_amd64",
+    packagePath: "57/60/a645cca710448004268b7731c4dc6fc7d084a7c620fc73ecc2127cb61661",
+    sha256: "855632ee1d2a8491986efa54c562b806cd32477761889a1e13624b519d98a45e",
   },
-  "aarch64-unknown-linux-gnu": {
-    archiveName: "uv-aarch64-unknown-linux-gnu.tar.gz",
-    archiveKind: "tar.gz",
-  },
-  "aarch64-unknown-linux-musl": {
-    archiveName: "uv-aarch64-unknown-linux-musl.tar.gz",
-    archiveKind: "tar.gz",
-  },
+  "aarch64-unknown-linux-gnu": linuxArm64Wheel,
+  "aarch64-unknown-linux-musl": linuxArm64Wheel,
   "x86_64-unknown-linux-gnu": {
-    archiveName: "uv-x86_64-unknown-linux-gnu.tar.gz",
-    archiveKind: "tar.gz",
+    tag: "manylinux_2_17_x86_64.manylinux2014_x86_64",
+    packagePath: "90/b0/114463d056b6b328d45557001e848b8ab15539bd8f4fa7a457ccb83e2b5d",
+    sha256: "3da76cd4e2697de30928b8a8524bd39183ac1e08cb7e72833807c022b7cba6c4",
   },
   "x86_64-unknown-linux-musl": {
-    archiveName: "uv-x86_64-unknown-linux-musl.tar.gz",
-    archiveKind: "tar.gz",
+    tag: "musllinux_1_1_x86_64",
+    packagePath: "02/58/0a92505cfe2b02b1c2d6ded23e83763fe98b43fbe1a4e5cbd6866da3bdf7",
+    sha256: "77f4356548ee8dc47efae154efd4e930c65570e7d4971c57bdef592f6eefb39c",
   },
 };
 
@@ -93,11 +98,17 @@ export function uvAssetForPlatform(
   linuxLibc: LinuxLibc = detectLinuxLibc(),
 ): UvAsset {
   const target = uvTarget(platform, arch, linuxLibc);
-  const asset = assets[target];
-  if (!asset) {
+  const wheel = wheels[target];
+  if (!wheel) {
     throw new Error(`MLIA cannot bootstrap uv on ${platform}/${arch}${platform === "linux" ? `/${linuxLibc}` : ""}.`);
   }
-  return { target, ...asset };
+  const wheelName = `uv-${managedUvVersion}-py3-none-${wheel.tag}.whl`;
+  return {
+    target,
+    wheelName,
+    downloadUrl: `https://files.pythonhosted.org/packages/${wheel.packagePath}/${wheelName}`,
+    sha256: wheel.sha256,
+  };
 }
 
 export function getManagedUvPath(
@@ -146,85 +157,54 @@ async function installManagedUv(
   asset: UvAsset,
   executablePath: string,
 ): Promise<string> {
-  const checksumManifestSha256 =
-    options.checksumManifestSha256 ?? managedUvChecksumManifestSha256;
   const installDir = path.dirname(executablePath);
-  if (
-    !options.force &&
-    await hasValidInstallation(
-      installDir,
-      executablePath,
-      asset,
-      checksumManifestSha256,
-    )
-  ) {
+  if (!options.force && await hasValidInstallation(installDir, executablePath, asset)) {
     options.log?.(`Using managed uv ${managedUvVersion}: ${executablePath}`);
     return executablePath;
   }
 
   const uvRoot = managedUvRoot(options.globalStoragePath);
   const stagingDir = path.join(uvRoot, `.staging-${process.pid}-${randomUUID()}`);
-  const checksumManifestPath = path.join(stagingDir, "sha256.sum");
-  const archivePath = path.join(stagingDir, asset.archiveName);
-  const extractedRoot = path.join(stagingDir, "extracted");
-  const extractedPayloadRoot = path.join(
-    extractedRoot,
-    archivePayloadDirectoryName(asset),
-  );
-  const platform = options.platform ?? process.platform;
-  const extractedExecutable = path.join(extractedPayloadRoot, uvExecutableName(platform));
+  const wheelPath = path.join(stagingDir, asset.wheelName);
+  const payloadRoot = path.join(stagingDir, "payload");
+  const executableName = path.basename(executablePath);
+  const extractedExecutable = path.join(payloadRoot, executableName);
   const download = options.download ?? downloadFile;
-  const extract = options.extract ?? extractArchive;
-  const checksumManifestUrl = `${releaseBaseUrl}/sha256.sum`;
-  const archiveUrl = `${releaseBaseUrl}/${asset.archiveName}`;
 
   await fs.mkdir(stagingDir, { recursive: true });
   try {
-    options.progress?.(`Downloading uv ${managedUvVersion} checksums`);
-    options.log?.(`Downloading uv checksum manifest: ${checksumManifestUrl}`);
-    await download(checksumManifestUrl, checksumManifestPath);
-
-    options.progress?.("Verifying uv checksum manifest");
-    const actualManifestSha256 = await fileSha256(checksumManifestPath);
-    if (actualManifestSha256 !== checksumManifestSha256) {
-      throw new Error(
-        "Downloaded uv checksum manifest failed SHA-256 verification: " +
-          `expected ${checksumManifestSha256}, got ${actualManifestSha256}.`,
-      );
-    }
-    const checksumManifest = await fs.readFile(checksumManifestPath, "utf8");
-    const archiveSha256 = parseUvChecksumManifest(checksumManifest, asset.archiveName);
-
     options.progress?.(`Downloading uv ${managedUvVersion}`);
-    options.log?.(`Downloading managed uv: ${archiveUrl}`);
-    await download(archiveUrl, archivePath);
+    options.log?.(`Downloading managed uv wheel: ${asset.downloadUrl}`);
+    await download(asset.downloadUrl, wheelPath);
 
     options.progress?.("Verifying uv download");
-    const actualArchiveSha256 = await fileSha256(archivePath);
-    if (actualArchiveSha256 !== archiveSha256) {
+    const actualSha256 = await fileSha256(wheelPath);
+    if (actualSha256 !== asset.sha256) {
       throw new Error(
-        "Downloaded uv archive failed SHA-256 verification: " +
-          `expected ${archiveSha256}, got ${actualArchiveSha256}.`,
+        "Downloaded uv wheel failed SHA-256 verification: " +
+          `expected ${asset.sha256}, got ${actualSha256}.`,
       );
     }
 
     options.progress?.("Installing managed uv");
-    await fs.mkdir(extractedRoot, { recursive: true });
-    await extract(archivePath, extractedRoot, asset.archiveKind);
-    await fs.access(extractedExecutable, fsConstants.F_OK);
+    await fs.mkdir(payloadRoot, { recursive: true });
+    await extractUvExecutable(wheelPath, extractedExecutable);
     if (process.platform !== "win32") {
       await fs.chmod(extractedExecutable, 0o755);
     }
-    await writeInstallMetadata(
-      extractedPayloadRoot,
-      asset,
-      checksumManifestSha256,
-      archiveSha256,
+    const metadata: UvInstallMetadata = {
+      version: managedUvVersion,
+      wheelName: asset.wheelName,
+      wheelSha256: asset.sha256,
+    };
+    await fs.writeFile(
+      path.join(payloadRoot, "vscode-mlia-uv.json"),
+      `${JSON.stringify(metadata, undefined, 2)}\n`,
+      "utf8",
     );
 
-    await fs.mkdir(uvRoot, { recursive: true });
     await fs.rm(installDir, { recursive: true, force: true });
-    await fs.rename(extractedPayloadRoot, installDir);
+    await fs.rename(payloadRoot, installDir);
     options.log?.(`Installed managed uv ${managedUvVersion}: ${executablePath}`);
     return executablePath;
   } finally {
@@ -232,27 +212,10 @@ async function installManagedUv(
   }
 }
 
-export function parseUvChecksumManifest(
-  content: string,
-  archiveName: string,
-): string {
-  const hashes = content.split(/\r?\n/u).flatMap((line) => {
-    const match = /^([0-9a-f]{64})\s+\*?(.+)$/iu.exec(line.trim());
-    return match?.[2] === archiveName ? [match[1].toLowerCase()] : [];
-  });
-  if (hashes.length !== 1) {
-    throw new Error(
-      `Verified uv checksum manifest contains ${hashes.length} entries for ${archiveName}; expected exactly one.`,
-    );
-  }
-  return hashes[0];
-}
-
 async function hasValidInstallation(
   installDir: string,
   executablePath: string,
   asset: UvAsset,
-  checksumManifestSha256: string,
 ): Promise<boolean> {
   try {
     const [metadataText] = await Promise.all([
@@ -261,32 +224,11 @@ async function hasValidInstallation(
     ]);
     const metadata = JSON.parse(metadataText) as Partial<UvInstallMetadata>;
     return metadata.version === managedUvVersion &&
-      metadata.archiveName === asset.archiveName &&
-      metadata.checksumManifestSha256 === checksumManifestSha256 &&
-      typeof metadata.archiveSha256 === "string" &&
-      /^[0-9a-f]{64}$/u.test(metadata.archiveSha256);
+      metadata.wheelName === asset.wheelName &&
+      metadata.wheelSha256 === asset.sha256;
   } catch {
     return false;
   }
-}
-
-async function writeInstallMetadata(
-  installDir: string,
-  asset: UvAsset,
-  checksumManifestSha256: string,
-  archiveSha256: string,
-): Promise<void> {
-  const metadata: UvInstallMetadata = {
-    version: managedUvVersion,
-    archiveName: asset.archiveName,
-    checksumManifestSha256,
-    archiveSha256,
-  };
-  await fs.writeFile(
-    path.join(installDir, "vscode-mlia-uv.json"),
-    `${JSON.stringify(metadata, undefined, 2)}\n`,
-    "utf8",
-  );
 }
 
 function managedUvExecutablePath(
@@ -297,20 +239,8 @@ function managedUvExecutablePath(
   return path.join(
     managedUvRoot(globalStoragePath),
     asset.target,
-    uvExecutableName(platform),
+    platform === "win32" ? "uv.exe" : "uv",
   );
-}
-
-function uvExecutableName(platform: NodeJS.Platform): string {
-  return platform === "win32" ? "uv.exe" : "uv";
-}
-
-function archivePayloadDirectoryName(asset: UvAsset): string {
-  const suffix = asset.archiveKind === "zip" ? ".zip" : ".tar.gz";
-  if (!asset.archiveName.endsWith(suffix)) {
-    throw new Error(`Unexpected uv archive name: ${asset.archiveName}`);
-  }
-  return asset.archiveName.slice(0, -suffix.length);
 }
 
 function managedUvRoot(globalStoragePath: string): string {
@@ -344,30 +274,33 @@ function detectLinuxLibc(): LinuxLibc {
   return typeof header?.glibcVersionRuntime === "string" ? "gnu" : "musl";
 }
 
-async function extractArchive(
-  archivePath: string,
-  destination: string,
-  kind: UvArchiveKind,
-): Promise<void> {
-  if (kind === "zip") {
-    await extractZipArchive(archivePath, destination);
-    return;
-  }
-  await extractTar({ file: archivePath, cwd: destination, gzip: true });
-}
-
-async function extractZipArchive(archivePath: string, destination: string): Promise<void> {
-  const destinationRoot = path.resolve(destination);
-  const zipFile = await openZipFile(archivePath);
+async function extractUvExecutable(wheelPath: string, executablePath: string): Promise<void> {
+  const executableEntry = `uv-${managedUvVersion}.data/scripts/${path.basename(executablePath)}`;
+  const zipFile = await openZipFile(wheelPath);
+  let found = false;
   try {
     await new Promise<void>((resolve, reject) => {
       zipFile.once("error", reject);
-      zipFile.once("end", resolve);
+      zipFile.once("end", () => {
+        if (found) resolve();
+        else reject(new Error(`uv wheel does not contain ${executableEntry}.`));
+      });
       zipFile.on("entry", (entry: yauzl.Entry) => {
-        handleZipEntry(zipFile, entry, destinationRoot).then(
-          () => zipFile.readEntry(),
-          reject,
-        );
+        // Never use wheel-supplied paths as output paths. Only the native uv
+        // binary is needed; Python wrappers, uvx and metadata are not installed.
+        if (entry.fileName !== executableEntry) {
+          zipFile.readEntry();
+          return;
+        }
+        const fileType = (entry.externalFileAttributes >>> 16) & 0o170000;
+        if (found || (fileType !== 0 && fileType !== 0o100000) || entry.uncompressedSize === 0) {
+          reject(new Error(`uv wheel contains an invalid or duplicate executable: ${executableEntry}.`));
+          return;
+        }
+        found = true;
+        openZipReadStream(zipFile, entry)
+          .then((stream) => pipeline(stream, createWriteStream(executablePath, { flags: "wx" })))
+          .then(() => zipFile.readEntry(), reject);
       });
       zipFile.readEntry();
     });
@@ -390,27 +323,6 @@ function openZipFile(archivePath: string): Promise<yauzl.ZipFile> {
       resolve(zipFile);
     });
   });
-}
-
-async function handleZipEntry(
-  zipFile: yauzl.ZipFile,
-  entry: yauzl.Entry,
-  destinationRoot: string,
-): Promise<void> {
-  const entryPath = path.resolve(destinationRoot, entry.fileName);
-  const relativePath = path.relative(destinationRoot, entryPath);
-  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
-    throw new Error(`Zip archive entry escapes destination: ${entry.fileName}`);
-  }
-
-  if (entry.fileName.endsWith("/")) {
-    await fs.mkdir(entryPath, { recursive: true });
-    return;
-  }
-
-  await fs.mkdir(path.dirname(entryPath), { recursive: true });
-  const readStream = await openZipReadStream(zipFile, entry);
-  await pipeline(readStream, createWriteStream(entryPath, { flags: "wx" }));
 }
 
 function openZipReadStream(

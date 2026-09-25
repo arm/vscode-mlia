@@ -46,6 +46,26 @@ arbitrary computed runtime imports. The regression suite exercises the real
 rules and verifies that the actual bundle command fails when a runtime package
 is moved to `devDependencies`, then succeeds when its declaration is restored.
 
+## Managed uv bootstrap
+
+`src/uvBootstrap.ts` pins the uv version and each supported platform's PyPI
+wheel URL and SHA-256. The bootstrap downloads directly from
+`files.pythonhosted.org`, verifies the pinned hash, and uses `yauzl` to extract
+only `uv-VERSION.data/scripts/uv` (or `uv.exe`). It does not install the wheel
+as a Python package or require Python, pip, or a system archive tool.
+
+When updating uv, obtain the wheel filenames, URLs and SHA-256 hashes from
+`https://pypi.org/pypi/uv/VERSION/json`. Update all platform pins together and
+check the wheel layout. The aarch64 Linux wheel is shared by glibc and musl;
+the x86-64 Linux wheels are separate. Installation metadata records the wheel
+filename and hash, so changed pins trigger a fresh installation.
+
+The default tests use small ZIP fixtures and exercise the real extractor.
+Opt into live download, verification, extraction, execution, reuse and forced
+reinstallation with `MLIA_TEST_UV_BOOTSTRAP=1 npm test` (PowerShell:
+`$env:MLIA_TEST_UV_BOOTSTRAP = '1'; npm test`). Run this on Windows and Linux;
+on Linux it also launches the musl wheel's static binary.
+
 ## Private VSIX releases
 
 The same extension supports public and private distributions. For a private
