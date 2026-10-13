@@ -210,6 +210,7 @@ export class AnalysisStore {
         }
 
         this.analysesById.set(id, analysis);
+        this.currentId = id;
         this.emit();
         return analysis;
       }
@@ -283,9 +284,6 @@ export class AnalysisStore {
       };
       await this.writeManifest(failed);
       this.analysesById.set(id, failed);
-      if (this.currentId === id) {
-        this.currentId = undefined;
-      }
       this.emit();
       return true;
     });
@@ -323,7 +321,7 @@ export class AnalysisStore {
   public setCurrent(id: string): Promise<boolean> {
     return this.runMutation(async () => {
       const analysis = this.analysesById.get(id);
-      if (!analysis || analysis.status !== "complete") {
+      if (!analysis) {
         return false;
       }
       this.currentId = id;
@@ -485,7 +483,7 @@ export class AnalysisStore {
     for (const [id, analysis] of analyses) {
       this.analysesById.set(id, analysis);
     }
-    this.currentId = previousCurrentId !== undefined && analyses.get(previousCurrentId)?.status === "complete"
+    this.currentId = previousCurrentId !== undefined && analyses.has(previousCurrentId)
       ? previousCurrentId
       : undefined;
     this.emit();
@@ -758,9 +756,6 @@ export class AnalysisStore {
         id,
         previousSelection === undefined ? analysis : { ...analysis, overlaySelection: previousSelection },
       );
-      if (this.currentId === id && analysis.status !== "complete") {
-        this.currentId = undefined;
-      }
       this.emit();
     }
   }

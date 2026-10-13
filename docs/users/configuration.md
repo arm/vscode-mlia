@@ -16,7 +16,9 @@ Unless stated otherwise, changes apply to the current VS Code window or workspac
 
 Default: `true`
 
-Automatically opens Model Explorer while an analysis runs and when it completes. When disabled, completed analyses are still saved and made current.
+Automatically opens Model Explorer when an analysis starts. On completion, its existing tab updates without taking focus. If that run is still current, its results tab is shown even if you closed the progress tab. A background run does not reveal a tab or replace a newer selection.
+
+When disabled, runs are still saved and become current immediately, but no tab opens automatically.
 
 <a id="sync-model-explorer-selection-to-code"></a>
 ### `vscode-mlia.syncModelExplorerSelectionToCode`

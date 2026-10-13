@@ -163,7 +163,7 @@ describe("renderCurrentAnalysis", () => {
     const html = renderCurrentAnalysis({ kind: "empty" }, "fixed-nonce");
 
     assert.match(html, /No current analysis run/);
-    assert.match(html, /Open a completed analysis run below/);
+    assert.match(html, /Select an analysis run below/);
     assert.match(html, /run a new analysis/);
     assert.doesNotMatch(html, /Open Model Explorer/);
   });
@@ -260,6 +260,22 @@ describe("renderCurrentAnalysis", () => {
     assert.doesNotMatch(html, /Open Model Explorer|open-model-explorer/);
   });
 
+  for (const [status, reason] of [
+    ["failed", "failed"],
+    ["cancelled", "was cancelled"],
+    ["interrupted", "was interrupted"],
+  ] as const) {
+    it(`explains unavailable overlays for a ${status} run as a terminal state`, () => {
+      const html = renderCurrentAnalysis({
+        kind: "current",
+        analysis: analysis(status),
+        overlays: [],
+      }, "fixed-nonce");
+      assert.ok(html.includes(`Overlays are unavailable because this analysis run ${reason}.`));
+      assert.doesNotMatch(html, /Overlays are unavailable while/);
+    });
+  }
+
   it("keeps colliding breakdown and metric qualifier keys visibly distinct", () => {
     const qualified: OverlayKey = {
       ...overlay("metric", "work", "items"),
@@ -328,6 +344,70 @@ describe("renderCurrentAnalysis", () => {
 });
 
 describe("CurrentAnalysisViewProvider", () => {
+  it("offers cancellation only for the selected owned run and ignores stale button clicks", () => {
+    let current = { ...analysis("running", "first"), ownerPid: 100 };
+    const annotations = new SourceAnnotationIndex({ uriForFile: (file) => file });
+    const cancelled: string[] = [];
+    let logsShown = 0;
+    const provider = new CurrentAnalysisViewProvider({
+      currentAnalysis: () => current,
+      annotations,
+      setOverlaySelection: () => undefined,
+      isControllable: (value) => value.status === "running" && value.ownerPid === 100,
+      cancelAnalysis: (value) => { cancelled.push(value.id); },
+      showLog: () => { logsShown += 1; },
+    });
+    const view = viewHarness(provider);
+    assert.match(view.webview.html, /data-command="cancelAnalysis" data-analysis-id="first"/);
+    view.receive({ command: "cancelAnalysis", analysisId: "first" });
+    assert.deepStrictEqual(cancelled, ["first"]);
+
+    current = { ...analysis("running", "second"), ownerPid: 100 };
+    provider.refresh();
+    view.receive({ command: "cancelAnalysis", analysisId: "first" });
+    view.receive({ command: "cancelAnalysis" });
+    assert.deepStrictEqual(cancelled, ["first"]);
+
+    current = { ...current, ownerPid: 200 };
+    provider.refresh();
+    assert.doesNotMatch(view.webview.html, /data-command="cancelAnalysis"/);
+    view.receive({ command: "cancelAnalysis", analysisId: "second" });
+    current = { ...current, status: "failed", error: "Estimator failed" };
+    provider.refresh();
+    assert.match(view.webview.html, /Estimator failed/);
+    assert.match(view.webview.html, /Show MLIA Log/);
+    view.receive({ command: "showLog" });
+    view.receive({ command: "cancelAnalysis", analysisId: "second" });
+    assert.strictEqual(logsShown, 1);
+    assert.deepStrictEqual(cancelled, ["first"]);
+    provider.dispose();
+  });
+
+  it("clears prior source results for incomplete selections and restores them on completion", () => {
+    let current = analysis("complete", "previous");
+    const annotations = new SourceAnnotationIndex({ uriForFile: (file) => file });
+    const provider = new CurrentAnalysisViewProvider({
+      currentAnalysis: () => current,
+      annotations,
+      setOverlaySelection: () => undefined,
+    });
+    const view = viewHarness(provider);
+    const previousUri = path.normalize("/build/previous.cc");
+    assert.ok(annotations.sourceLineRecordsForUri(previousUri).length > 0);
+    for (const status of ["running", "failed", "cancelled", "interrupted"] as const) {
+      current = analysis(status, "new");
+      provider.refresh();
+      assert.deepStrictEqual(annotations.sourceLineRecordsForUri(previousUri), []);
+      assert.strictEqual(annotations.selectedOverlayKey, undefined);
+      assert.doesNotMatch(view.webview.html, /Result 1 · performance/);
+    }
+    current = analysis("complete", "new");
+    provider.refresh();
+    assert.ok(annotations.sourceLineRecordsForUri(path.normalize("/build/new.cc")).length > 0);
+    assert.strictEqual(annotations.selectedOverlayKey?.name, "total_cycles");
+    provider.dispose();
+  });
+
   it("follows only AnalysisStore.currentAnalysis and remembers each analysis overlay choice", () => {
     let current: Analysis | undefined;
     const annotations = new SourceAnnotationIndex({ uriForFile: (file) => file });

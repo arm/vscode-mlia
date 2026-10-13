@@ -78,6 +78,10 @@ The extension runs MLIA in its managed environment and creates a dedicated outpu
 - Mappings that connect MLIA results to Model Explorer nodes.
 - Debug output for diagnostics.
 
+Each new run becomes the **Current Analysis Run** immediately. You can select another run while it executes; finishing the background run does not change your selection or reveal its tab.
+
+A progress notification identifies the run by its input file, checks, and target profile. It remains active until the run finishes and offers **Cancel**. That button cancels the notification's run, even if you have selected another analysis. The progress bar is indeterminate because MLIA does not report a completion percentage.
+
 Each run records its input paths, mode, selected checks, target profile, status, output, and selected overlay. Completed and failed runs are persisted across VS Code sessions.
 
 ## Managing runs
@@ -88,8 +92,8 @@ The **Analysis Runs** view lists saved runs with their current status.
 
 Available actions include:
 
-- Select a run to make it current.
-- Cancel a running analysis started by the current extension session.
+- Select any run, including running, failed, cancelled, or interrupted runs, to make it current and open its tab.
+- Cancel a running analysis started by the current extension session, using its row's stop icon or **Cancel Analysis** in **Current Analysis Run**. The **Cancel Analysis** command also cancels the current run.
 - Open a run's output folder.
 - Delete a finished run.
 - Open the root analysis-runs folder.

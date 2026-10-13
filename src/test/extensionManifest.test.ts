@@ -174,8 +174,8 @@ describe("MLIA settings", () => {
           default: true,
           scope: "window",
           description:
-            "Automatically open Model Explorer while an analysis runs and when it completes. " +
-            "Completed analyses are still persisted and made current when disabled.",
+            "Automatically open Model Explorer when an analysis starts and show results when it completes, " +
+            "without changing a newer run selection. New runs become current immediately even when disabled.",
         },
         "vscode-mlia.showCodeLens": {
           type: "boolean",
@@ -286,7 +286,7 @@ describe("analysis run actions", () => {
   it("shows cancel only for running analyses owned by this extension host", () => {
     assert.deepStrictEqual(action("vscode-mlia.cancelAnalysis"), {
       command: "vscode-mlia.cancelAnalysis",
-      when: "view == mlia.analyses && viewItem == analysis.running.controllable.other",
+      when: "view == mlia.analyses && viewItem =~ /^analysis\\.running\\.controllable\\./",
       group: "inline@1",
     });
   });

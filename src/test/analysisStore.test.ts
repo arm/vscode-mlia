@@ -97,6 +97,36 @@ afterEach(async () => {
 });
 
 describe("AnalysisStore persistence", () => {
+  it("selects new runs immediately and retains selection through failure and rescans", async () => {
+    const store = makeStore(await makeStorage());
+    const first = await store.allocateRunning("first.vgf", "profile");
+    assert.strictEqual(store.currentAnalysis?.id, first.id);
+    const second = await store.allocateRunning("second.vgf", "profile");
+    assert.strictEqual(store.currentAnalysis?.id, second.id);
+    assert.strictEqual(await store.setCurrent(first.id), true);
+    await store.fail(first.id, "test failure");
+    await store.rescan();
+    assert.strictEqual(store.currentAnalysis?.id, first.id);
+    assert.strictEqual(store.currentAnalysis?.status, "failed");
+    assert.strictEqual(await store.setCurrent(second.id), true);
+    await store.cancel(second.id);
+    await store.rescan();
+    assert.strictEqual(store.currentAnalysis?.status, "cancelled");
+    assert.strictEqual(await store.setCurrent("missing"), false);
+    assert.strictEqual(store.currentAnalysis?.id, second.id);
+  });
+
+  it("keeps an interrupted run selected after its owner disappears", async () => {
+    const alivePids = [100];
+    const store = makeStore(await makeStorage(), { alivePids });
+    const run = await store.allocateRunning("model.vgf", "profile");
+    alivePids.length = 0;
+    await store.rescan();
+    assert.strictEqual(store.currentAnalysis?.id, run.id);
+    assert.strictEqual(store.currentAnalysis?.status, "interrupted");
+    assert.strictEqual(await store.setCurrent(run.id), true);
+  });
+
   it("allocates a durable UUID directory and persists running ownership before returning", async () => {
     const storage = await makeStorage();
     const store = new AnalysisStore({ globalStoragePath: storage, ownerPid: 4321, isProcessAlive: () => true });

@@ -14,6 +14,7 @@ export interface StoppableAnalysis {
 export interface AnalysisPanelController {
   openRunning: (analysis: Analysis, focus: ModelExplorerFocusIntent) => void;
   open: (analysis: Analysis, focus: ModelExplorerFocusIntent) => Promise<void>;
+  update: (analysis: Analysis) => Promise<void>;
   showError: (analysisId: string, message: string) => void;
   close: (analysisId: string) => void;
 }
@@ -64,9 +65,10 @@ export async function completeAnalysis(
   if (!completed) {
     return false;
   }
-  await store.setCurrent(completed.id);
-  if (autoOpen) {
-    await panels.open(completed, "focus");
+  if (autoOpen && store.currentAnalysis?.id === completed.id) {
+    await panels.open(completed, "preserve");
+  } else {
+    await panels.update(completed);
   }
   return true;
 }

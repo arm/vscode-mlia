@@ -90,6 +90,19 @@ export class AnalysisPanelManager implements vscode.Disposable {
     }
   }
 
+  /** Refresh an existing tab without opening, revealing, or focusing it. */
+  public async update(analysis: Analysis): Promise<void> {
+    const managed = this.panels.get(analysis.id);
+    if (!managed || this.disposed || managed.state === "disposed") {
+      return;
+    }
+    try {
+      await this.showAnalysis(analysis, managed);
+    } catch {
+      // Artifact errors are already displayed by loadPanel.
+    }
+  }
+
   public async openForSelection(
     analysis: Analysis,
     node: ModelExplorerNodeReference,
@@ -243,8 +256,7 @@ export class AnalysisPanelManager implements vscode.Disposable {
     initialSelection?: ModelExplorerNodeReference,
   ): Promise<SourceOverlayOpenOutcome | false> {
     this.options.log?.(`Analysis panel open requested: id=${analysis.id}, status=${analysis.status}`);
-    const canOpen = analysis.status === "failed" ||
-      (analysis.status === "complete" && analysis.artifacts !== undefined);
+    const canOpen = analysis.status !== "complete" || analysis.artifacts !== undefined;
     if (this.disposed || !canOpen) {
       this.options.log?.(
         `Analysis panel open skipped: id=${analysis.id}, disposed=${this.disposed}, ` +
@@ -264,9 +276,24 @@ export class AnalysisPanelManager implements vscode.Disposable {
       managed.webview.panel.viewColumn,
       focus === "preserve",
     );
-    if (analysis.status === "failed") {
-      if (!existing || managed.state !== "error") {
-        this.showFailedAnalysis(analysis, managed);
+    return this.showAnalysis(analysis, managed, initialSelection);
+  }
+
+  private async showAnalysis(
+    analysis: Analysis,
+    managed: ManagedAnalysisPanel,
+    initialSelection?: ModelExplorerNodeReference,
+  ): Promise<SourceOverlayOpenOutcome | false> {
+    if (analysis.status === "running") {
+      return "ready";
+    }
+    if (analysis.status !== "complete") {
+      if (managed.state !== "error") {
+        if (analysis.status === "failed") {
+          this.showFailedAnalysis(analysis, managed);
+        } else {
+          this.setError(managed, analysis.error ?? `Analysis ${analysis.status}.`, { showLog: false });
+        }
       }
       return "ready";
     }

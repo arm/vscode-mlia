@@ -25,6 +25,7 @@ export type CurrentAnalysisState =
       codeLensEnabled?: boolean;
       heatmapEnabled?: boolean;
       sourceMappings?: readonly SourceMappingDiagnostics[];
+      canCancel?: boolean;
     };
 
 export interface CurrentAnalysisAnnotations {
@@ -43,6 +44,9 @@ export interface CurrentAnalysisAnnotations {
 
 export interface CurrentAnalysisViewOptions {
   currentAnalysis: () => Analysis | undefined;
+  isControllable?: (analysis: Analysis) => boolean;
+  cancelAnalysis?: (analysis: Analysis) => void;
+  showLog?: () => void;
   annotations: CurrentAnalysisAnnotations;
   setOverlaySelection: (analysis: Analysis, selection: OverlaySelection) => void;
   isCodeLensEnabled?: () => boolean;
@@ -88,8 +92,20 @@ export class CurrentAnalysisViewProvider implements vscode.WebviewViewProvider, 
         command?: unknown;
         overlayId?: unknown;
         locationId?: unknown;
+        analysisId?: unknown;
       };
       switch (candidate.command) {
+        case "cancelAnalysis": {
+          const current = this.options.currentAnalysis();
+          if (current && current.id === candidate.analysisId &&
+              current.status === "running" && this.options.isControllable?.(current)) {
+            this.options.cancelAnalysis?.(current);
+          }
+          break;
+        }
+        case "showLog":
+          this.options.showLog?.();
+          break;
         case "openSettings":
           this.options.openSettings?.();
           break;
@@ -194,6 +210,7 @@ export class CurrentAnalysisViewProvider implements vscode.WebviewViewProvider, 
     this.state = {
       kind: "current",
       analysis: current,
+      canCancel: current.status === "running" && (this.options.isControllable?.(current) ?? false),
       overlays: this.overlays,
       selectedOverlayId: this.selectedOverlay === undefined
         ? undefined
@@ -287,7 +304,7 @@ export function renderCurrentAnalysis(
     });
     document.querySelectorAll('[data-command]').forEach((element) => {
       element.addEventListener('click', () => {
-        vscode.postMessage({ command: element.dataset.command });
+        vscode.postMessage({ command: element.dataset.command, analysisId: element.dataset.analysisId });
       });
     });
     document.querySelectorAll('[data-location-id]').forEach((element) => {
@@ -305,7 +322,7 @@ export function renderCurrentAnalysis(
 
 function currentAnalysisContent(state: CurrentAnalysisState): string {
   if (state.kind === "empty") {
-    return '<p class="empty">No current analysis run. Open a completed analysis run below, or run a new analysis.</p>';
+    return '<p class="empty">No current analysis run. Select an analysis run below, or run a new analysis.</p>';
   }
 
   const { analysis } = state;
@@ -329,7 +346,12 @@ function currentAnalysisContent(state: CurrentAnalysisState): string {
       `<dt>Profiling data${analysis.profilingDataPaths.length > 1 ? ` ${index + 1}` : ""}</dt><dd>${escapeHtml(profilingDataPath)}</dd>`
     ),
   ].join("");
-  return `${overlayContent}
+  const actions = analysis.status !== "complete"
+    ? `<p class="run-actions">${state.canCancel
+      ? `<button class="link-button" type="button" data-command="cancelAnalysis" data-analysis-id="${escapeHtml(analysis.id)}">Cancel Analysis</button> · `
+      : ""}<button class="link-button" type="button" data-command="showLog">Show MLIA Log</button></p>`
+    : "";
+  return `${actions}${overlayContent}
   <dl>
     ${inputRows}
     <dt>Mode</dt><dd>${escapeHtml(presentation.mode)}</dd>
@@ -496,9 +518,13 @@ function modelStatisticValue(
 
 function overlaySelectorContent(state: Extract<CurrentAnalysisState, { kind: "current" }>): string {
   if (state.overlays.length === 0) {
-    const message = state.analysis.status === "complete"
-      ? "No overlays are available in standardized output for this analysis run."
-      : `Overlays are unavailable while this analysis run is ${state.analysis.status}.`;
+    const message = {
+      complete: "No overlays are available in standardized output for this analysis run.",
+      running: "Overlays are unavailable while this analysis run is running.",
+      failed: "Overlays are unavailable because this analysis run failed.",
+      cancelled: "Overlays are unavailable because this analysis run was cancelled.",
+      interrupted: "Overlays are unavailable because this analysis run was interrupted.",
+    }[state.analysis.status];
     return `<div class="overlay-control"><label for="overlay">Overlay:</label>
   <select id="overlay" aria-label="Overlay" disabled><option value="">Unavailable</option></select>
   <p class="hint">${escapeHtml(message)}</p>${sourcePresentationWarning(state)}</div>`;

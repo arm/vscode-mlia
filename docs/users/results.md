@@ -19,7 +19,11 @@ Set [`vscode-mlia.autoOpenModelExplorer`](configuration.md#auto-open-model-explo
 
 ## Current Analysis Run
 
-The Current Analysis Run view shows:
+The Current Analysis Run view follows the selected run, including running and failed runs. It shows **Cancel Analysis** for running analyses owned by this extension session, and **Show MLIA Log** for runs without completed results. This log is the shared output for the current extension session, not an archived per-run log.
+
+Selecting a run without completed results clears the previous run's source heatmaps and CodeLens. They become available again when the selected run completes successfully or you select a completed run.
+
+The view shows:
 
 - Source-model and profiling-data paths.
 - Estimation or profiling mode.

@@ -12,6 +12,7 @@ import {
   startAnalysis,
 } from "./analysisLifecycle";
 import { checkPerformance } from "./checkPerformance";
+import { showAnalysisProgress } from "./analysisProgress";
 import { CurrentAnalysisViewProvider } from "./currentAnalysisView";
 import {
   classifyManagedEnvironment,
@@ -203,8 +204,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     panelManager,
   );
   context.subscriptions.push(modelExplorerSerializer);
+  const cancelRun = async (analysis: Analysis): Promise<void> => {
+    if (await cancelAnalysis(analysisStore, runningCommands, analysis.id)) {
+      panelManager.showError(analysis.id, "Analysis cancelled.");
+    } else {
+      void vscode.window.showWarningMessage("This analysis is not controllable by the current extension host.");
+    }
+  };
   const currentAnalysisProvider = new CurrentAnalysisViewProvider({
     currentAnalysis: () => analysisStore.currentAnalysis,
+    isControllable: (analysis) => analysisStore.isControllable(analysis),
+    cancelAnalysis: (analysis) => { void cancelRun(analysis); },
+    showLog: () => outputChannel.show(true),
     annotations: sourceAnnotations,
     setOverlaySelection: (analysis, selection) => {
       void analysisStore.setOverlaySelection(analysis.id, selection);
@@ -490,14 +501,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   );
   const cancelAnalysisCommand = vscode.commands.registerCommand(
     "vscode-mlia.cancelAnalysis",
-    async (item: AnalysisTreeItem) => {
-      if (!item?.analysis) {
-        return;
-      }
-      if (await cancelAnalysis(analysisStore, runningCommands, item.analysis.id)) {
-        panelManager.showError(item.analysis.id, "Analysis cancelled.");
-      } else {
-        void vscode.window.showWarningMessage("This analysis is not controllable by the current extension host.");
+    async (item?: AnalysisTreeItem) => {
+      const analysis = item?.analysis ?? analysisStore.currentAnalysis;
+      if (analysis) {
+        await cancelRun(analysis);
       }
     },
   );
@@ -799,8 +806,21 @@ async function checkPerformanceCommandHandler(
         };
       }
 
-      showMliaCheckPerformanceProgress(result.started.completion, selectedTargetProfile, analysisOptions);
-      void result.settled;
+      void showAnalysisProgress(vscode, {
+        analysis: result.analysis,
+        completion: result.settled,
+        cancel: async (analysisId) => {
+          const cancelled = await cancelAnalysis(analysisStore, runningCommands, analysisId);
+          if (cancelled) {
+            panelManager.showError(analysisId, "Analysis cancelled.");
+          }
+          return cancelled;
+        },
+        reportError: (message) => {
+          logLine(message);
+          void vscode.window.showErrorMessage(message);
+        },
+      });
       return { ok: true, runtimeDir: result.started.runtimeDir };
     },
     showErrorMessage: vscode.window.showErrorMessage.bind(vscode.window),
@@ -944,25 +964,6 @@ function isSettingEnabled(setting: string): boolean {
   return vscode.workspace
     .getConfiguration("vscode-mlia")
     .get<boolean>(setting, true);
-}
-
-function showMliaCheckPerformanceProgress(
-  completion: Promise<unknown>,
-  targetProfile: string,
-  analysisOptions: MliaAnalysisOptions,
-): void {
-  const analysisTypes = [
-    analysisOptions.performance ? "performance" : undefined,
-    analysisOptions.compatibility ? "compatibility" : undefined,
-  ].filter((value): value is string => value !== undefined).join(" and ");
-  void vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Window,
-      title: `Running MLIA ${analysisTypes} analysis for ${targetProfile}`,
-      cancellable: false,
-    },
-    async () => completion,
-  );
 }
 
 function getTargetProfile(): string | undefined {

@@ -102,19 +102,21 @@ function acceptingStore(completed: Analysis, events: string[] = []) {
 }
 
 describe("analysis activation", () => {
-  it("keeps native completed-analysis activation on analysis entries", () => {
-    assert.deepStrictEqual(analysisActivationCommand(analysis()), {
-      command: activateAnalysisCommand,
-      title: "Open Analysis Run and Set as Current",
-      arguments: ["analysis-a"],
+  for (const status of ["running", "complete", "failed", "cancelled", "interrupted"] as const) {
+    it(`selects and opens a ${status} analysis while preserving sidebar focus`, async () => {
+      const selected = analysis(status);
+      assert.deepStrictEqual(analysisActivationCommand(selected), {
+        command: activateAnalysisCommand,
+        title: "Open Analysis Run and Set as Current",
+        arguments: [selected.id],
+      });
+      const events: string[] = [];
+      assert.strictEqual(await activateAnalysis(acceptingStore(selected, events), {
+        open: async (value, focus) => { events.push(`open:${value.id}:${focus}`); },
+      }, selected.id), true);
+      assert.deepStrictEqual(events, ["current:analysis-a", "open:analysis-a:preserve"]);
     });
-    assert.deepStrictEqual(analysisActivationCommand(analysis("failed")), {
-      command: activateAnalysisCommand,
-      title: "Open Failed Analysis Run",
-      arguments: ["analysis-a"],
-    });
-    assert.strictEqual(analysisActivationCommand(analysis("running")), undefined);
-  });
+  }
 
   it("sets a completed analysis as current before opening its panel while preserving focus", async () => {
     const completed = analysis();
@@ -133,7 +135,7 @@ describe("analysis activation", () => {
     assert.deepStrictEqual(events, ["current:analysis-a", "open:analysis-a:preserve"]);
   });
 
-  it("opens a failed analysis without trying to set it as current", async () => {
+  it("makes a failed analysis current before opening its error", async () => {
     const failed = { ...analysis("failed"), error: "stored failure" };
     const events: string[] = [];
     const store = {
@@ -150,7 +152,7 @@ describe("analysis activation", () => {
     };
 
     assert.strictEqual(await activateAnalysis(store, panels, failed.id), true);
-    assert.deepStrictEqual(events, ["open:analysis-a:preserve"]);
+    assert.deepStrictEqual(events, ["current:analysis-a", "open:analysis-a:preserve"]);
   });
 
   it("creates and reveals a new panel for tree activation without taking sidebar focus", async () => {
@@ -185,9 +187,7 @@ describe("analysis activation", () => {
     assert.strictEqual(state.commits(), 1);
   });
 
-  it("does not open missing, incomplete, or rejected selections", async () => {
-    const running = analysis("running");
-    let setCurrentCalls = 0;
+  it("does not open missing or rejected selections", async () => {
     let openCalls = 0;
     const panels = {
       open: async () => {
@@ -195,20 +195,10 @@ describe("analysis activation", () => {
       },
     };
 
-    assert.strictEqual(
-      await activateAnalysis(
-        {
-          get: (id) => id === running.id ? running : undefined,
-          setCurrent: async () => {
-            setCurrentCalls += 1;
-            return true;
-          },
-        },
-        panels,
-        running.id,
-      ),
-      false,
-    );
+    assert.strictEqual(await activateAnalysis({
+      get: () => undefined,
+      setCurrent: async () => true,
+    }, panels, "removed-during-selection"), false);
     assert.strictEqual(
       await activateAnalysis(
         {
@@ -224,7 +214,6 @@ describe("analysis activation", () => {
       get: () => undefined,
       setCurrent: async () => true,
     }, panels, undefined), false);
-    assert.strictEqual(setCurrentCalls, 0);
     assert.strictEqual(openCalls, 0);
   });
 });

@@ -64,12 +64,16 @@ function panels(): AnalysisPanelController & {
   opened: Array<{ analysis: Analysis; focus: string }>;
   errors: Array<{ analysisId: string; message: string }>;
   closed: string[];
+  updated: Analysis[];
 } {
   const started: Array<{ analysis: Analysis; focus: string }> = [];
   const opened: Array<{ analysis: Analysis; focus: string }> = [];
   const errors: Array<{ analysisId: string; message: string }> = [];
   const closed: string[] = [];
+  const updated: Analysis[] = [];
   return {
+    updated,
+    update: async (analysis) => { updated.push(analysis); },
     started,
     opened,
     errors,
@@ -186,7 +190,18 @@ describe("analysis lifecycle", () => {
     assert.deepStrictEqual(logs, []);
   });
 
-  it("makes a successful analysis current and opens its panel", async () => {
+  it("does not take selection or reveal a background run when it completes", async () => {
+    const analysisStore = await store();
+    const panelController = panels();
+    const background = await analysisStore.allocateRunning("first.vgf", "profile");
+    const selected = await analysisStore.allocateRunning("second.vgf", "profile");
+    await completeAnalysis(analysisStore, panelController, background.id, await artifacts(background), true);
+    assert.strictEqual(analysisStore.currentAnalysis?.id, selected.id);
+    assert.strictEqual(analysisStore.currentAnalysis?.status, "running");
+    assert.deepStrictEqual(panelController.opened, []);
+  });
+
+  it("keeps a successful analysis current and opens its panel without taking focus", async () => {
     const analysisStore = await store();
     const panelController = panels();
     const analysis = await analysisStore.allocateRunning("model.vgf", "neural-technology");
@@ -200,7 +215,7 @@ describe("analysis lifecycle", () => {
     assert.deepStrictEqual(analysisStore.get(analysis.id)?.entityNodeMappings, { results: [] });
     assert.deepStrictEqual(
       panelController.opened.map(({ analysis: opened, focus }) => ({ id: opened.id, focus })),
-      [{ id: analysis.id, focus: "focus" }],
+      [{ id: analysis.id, focus: "preserve" }],
     );
   });
 
@@ -234,7 +249,7 @@ describe("analysis lifecycle", () => {
     assert.strictEqual(commands.has(analysis.id), false);
   });
 
-  it("does not make current or open a panel when cancellation wins during artifact reads", async () => {
+  it("retains the cancelled selection without opening a panel when cancellation wins during artifact reads", async () => {
     const artifactRead = deferred();
     const continueRead = deferred();
     let deferArtifact = false;
@@ -261,7 +276,8 @@ describe("analysis lifecycle", () => {
     continueRead.resolve();
 
     assert.strictEqual(await completion, false);
-    assert.strictEqual(analysisStore.currentAnalysis, undefined);
+    assert.strictEqual(analysisStore.currentAnalysis?.id, analysis.id);
+    assert.strictEqual(analysisStore.currentAnalysis?.status, "cancelled");
     assert.deepStrictEqual(panelController.opened, []);
     assert.strictEqual(analysisStore.get(analysis.id)?.status, "cancelled");
   });

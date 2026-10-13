@@ -238,6 +238,38 @@ function resolveCall(state: ReturnType<typeof fixture>, index: number, marker = 
 }
 
 describe("AnalysisPanelManager", () => {
+  it("opens selected incomplete runs without trying to load results", async () => {
+    for (const status of ["running", "cancelled", "interrupted"] as const) {
+      const state = fixture();
+      await state.manager.open({ ...analysis(), status, artifacts: undefined }, "preserve");
+      assert.strictEqual(state.openOptions.length, 1);
+      assert.deepStrictEqual(state.reveals, [[2, true]]);
+      assert.deepStrictEqual(state.prepareCalls, []);
+      if (status === "running") {
+        assert.deepStrictEqual(state.errors, []);
+      } else {
+        assert.strictEqual(state.errors[0]?.message, `Analysis ${status}.`);
+      }
+    }
+  });
+
+  it("updates a background progress tab without revealing it or recreating a closed tab", async () => {
+    const state = fixture();
+    const running = { ...analysis(), status: "running" as const, artifacts: undefined };
+    state.manager.openRunning(running, "focus");
+    state.reveals.length = 0;
+    const updating = state.manager.update(analysis());
+    resolveCall(state, 0);
+    await updating;
+    assert.strictEqual(state.commits.length, 1);
+    assert.deepStrictEqual(state.reveals, []);
+    assert.strictEqual(state.openOptions.length, 1);
+    state.manager.close(running.id);
+    await state.manager.update(analysis());
+    assert.strictEqual(state.openOptions.length, 1);
+    assert.strictEqual(state.prepareCalls.length, 1);
+  });
+
   it("does not create or reveal a panel when an error is reported before one exists", () => {
     const state = fixture();
 
