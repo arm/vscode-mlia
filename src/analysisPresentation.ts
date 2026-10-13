@@ -1,5 +1,6 @@
 import { analysisInputDetails, analysisInputSummary } from "./analysisInputs";
 import type { Analysis } from "./analysisStore";
+import { analysisErrorMessage } from "./analysisErrors";
 
 export interface AnalysisPresentation {
   inputSummary: string;
@@ -31,7 +32,7 @@ export function analysisPresentation(analysis: Analysis): AnalysisPresentation {
       `Mode: ${mode}`,
       `Checks: ${checks}`,
       `Target profile: ${analysis.targetProfile}`,
-      ...(analysis.error ? [`Details: ${analysis.error}`] : []),
+      ...(analysis.error ? [`Details: ${analysisErrorMessage(analysis.error)}`] : []),
     ],
     panelTitle: `MLIA: ${inputSummary} · ${mode} · ${analysis.targetProfile}`,
   };

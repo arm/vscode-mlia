@@ -1,6 +1,7 @@
 import type * as vscode from "vscode";
 
 import { analysisPresentation } from "./analysisPresentation";
+import { analysisErrorMessage } from "./analysisErrors";
 import { Analysis } from "./analysisStore";
 import {
   type AttachModelExplorerWebviewOptions,
@@ -423,7 +424,7 @@ export class AnalysisPanelManager implements vscode.Disposable {
       managed.generation += 1;
     }
     managed.state = "error";
-    managed.webview.showError(message, { showLog: options.showLog ?? true });
+    managed.webview.showError(analysisErrorMessage(message), { showLog: options.showLog ?? true });
   }
 
   private createPanel(

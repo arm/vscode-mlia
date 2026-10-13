@@ -159,6 +159,18 @@ function viewHarness(provider: CurrentAnalysisViewProvider) {
 }
 
 describe("renderCurrentAnalysis", () => {
+  it("explains saved EULA failures without asking the user to pass API flags", () => {
+    const failed = {
+      ...analysis("failed"),
+      error: "EULA acceptance required for one or more backends. Pass accept_eula=True to proceed.",
+    };
+    const html = renderCurrentAnalysis({ kind: "current", analysis: failed, overlays: [] }, "fixed-nonce");
+    assert.match(html, /Run the analysis again and accept the EULA to continue\./);
+    assert.doesNotMatch(html, /accept_eula=True/);
+    assert.strictEqual(failed.error,
+      "EULA acceptance required for one or more backends. Pass accept_eula=True to proceed.");
+  });
+
   it("describes the absence of the repository's current analysis", () => {
     const html = renderCurrentAnalysis({ kind: "empty" }, "fixed-nonce");
 

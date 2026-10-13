@@ -114,6 +114,15 @@
           "editPresentation": "multilineText",
           "description": "Contents of the MLIA TOML configuration file used by analyses started from VS Code. The extension writes this text to its managed runtime and applies it through the MLIA watchdog before each analysis."
         },
+        "vscode-mlia.acceptedEulas": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "scope": "machine",
+          "description": "Accepted EULAs, keyed by agreement ID and the providing MLIA package version, with acceptance timestamps as values. Accept and Run adds entries here. Delete an entry to require acceptance again, or reset this setting to clear all acceptances. Manually adding valid entries grants acceptance without a prompt. Stored in user settings on this machine and excluded from Settings Sync."
+        },
         "vscode-mlia.extraCommandLineArgs": {
           "type": "array",
           "items": {
@@ -121,7 +130,7 @@
           },
           "default": [],
           "scope": "window",
-          "description": "Extra command-line arguments appended unchanged to MLIA analyses started by VS Code. Intended for advanced users."
+          "description": "Extra command-line arguments appended unchanged to MLIA analyses started by VS Code. Intended for advanced users. These arguments can cause unexpected behaviour in the VS Code integration. These arguments may also cause EULAs to be accepted without being shown to you, including when they change which backend is used."
         }
       }
     },
@@ -244,7 +253,7 @@
     "bundle": "npm run lint:dependencies && esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --sourcemap --outfile=dist/extension.js",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "test": "npm run compile && node --test out/test/analysisActivation.test.js out/test/analysisInputs.test.js out/test/analysisLifecycle.test.js out/test/analysisPanels.test.js out/test/analysisProgress.test.js out/test/analysisStore.test.js out/test/checkPerformance.test.js out/test/currentAnalysisView.test.js out/test/dependencyImports.test.js out/test/environmentState.test.js out/test/extensionManifest.test.js out/test/newAnalysisView.test.js out/test/modelExplorerWebview.test.js out/test/overlayCatalog.test.js out/test/overlaySynchronization.test.js out/test/pythonRuntime.test.js out/test/pythonRuntime.wheelhouse.integration.test.js out/test/sourceCodeLens.test.js out/test/sourceDecorations.test.js out/test/sourceLines.test.js out/test/sourceNavigation.test.js out/test/sourceOverlayActions.test.js out/test/uvBootstrap.test.js out/test/watchdog.test.js"
+    "test": "npm run compile && node --test out/test/analysisActivation.test.js out/test/analysisInputs.test.js out/test/analysisLifecycle.test.js out/test/analysisPanels.test.js out/test/analysisProgress.test.js out/test/analysisStore.test.js out/test/checkPerformance.test.js out/test/currentAnalysisView.test.js out/test/dependencyImports.test.js out/test/environmentState.test.js out/test/eula.test.js out/test/eulaView.test.js out/test/extensionManifest.test.js out/test/newAnalysisView.test.js out/test/modelExplorerWebview.test.js out/test/mliaPackageVersions.test.js out/test/overlayCatalog.test.js out/test/overlaySynchronization.test.js out/test/pythonRuntime.test.js out/test/pythonRuntime.wheelhouse.integration.test.js out/test/sourceCodeLens.test.js out/test/sourceDecorations.test.js out/test/sourceLines.test.js out/test/sourceNavigation.test.js out/test/sourceOverlayActions.test.js out/test/uvBootstrap.test.js out/test/watchdog.test.js"
   },
   "dependencies": {
     "yauzl": "^3.4.0"

@@ -8,6 +8,8 @@ import { afterEach, describe, it } from "node:test";
 import {
   CommandExecutionError,
   CommandRunner,
+  defaultCommandRunner,
+  defaultLongRunningCommandStarter,
   LongRunningCommandStarter,
   parseMliaTargets,
   getEntityNodeMappingsPath,
@@ -16,11 +18,20 @@ import {
   getStandardizedOutputPath,
   parseRuntimeEnv,
   refreshPythonRuntime,
+  queryMliaEulaText,
+  queryMliaEnvironment,
+  parseMliaEnvironment,
   runMliaCheckPerformance,
 } from "../pythonRuntime";
 import { getManagedUvPath, managedUvEnvironment } from "../uvBootstrap";
+import { requiredEula } from "../eula";
 
 const tempDirs: string[] = [];
+const packageVersions = { mlia: "1.2.3", "mlia-neural-technology": "2.0.0" };
+
+function environmentDiscovery(profiles?: string[]): string {
+  return JSON.stringify({ targets: targetDiscovery(profiles), packageVersions });
+}
 
 function targetDiscovery(profiles = ["ethos-u55", "ethos-u65"]): object[] {
   return [{
@@ -76,6 +87,82 @@ async function makeFixture(): Promise<{
 
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
+});
+
+describe("background command stdin", () => {
+  const readStdin = `
+    const timeout = setTimeout(() => {
+      process.stderr.write("stdin remained open");
+      process.exit(2);
+    }, 2000);
+    process.stdin.on("end", () => {
+      clearTimeout(timeout);
+      process.stdout.write("stdin reached EOF");
+      process.stderr.write("diagnostic output");
+    });
+    process.stdin.resume();
+  `;
+
+  it("gives analysis processes immediate EOF while capturing stdout and stderr", async () => {
+    const output: string[] = [];
+    const command = defaultLongRunningCommandStarter(
+      process.execPath, ["-e", readStdin], os.tmpdir(), (text) => output.push(text),
+    );
+    const result = await command.wait();
+    assert.deepStrictEqual(result, {
+      exitCode: 0,
+      stdout: "stdin reached EOF",
+      stderr: "diagnostic output",
+    });
+    assert.strictEqual(command.stdout(), result.stdout);
+    assert.strictEqual(command.stderr(), result.stderr);
+    assert.ok(output.join("").includes(result.stdout));
+    assert.ok(output.join("").includes(result.stderr));
+  });
+
+  it("also closes stdin for short-lived environment and discovery commands", async () => {
+    const output: string[] = [];
+    const result = await defaultCommandRunner(
+      process.execPath, ["-e", readStdin], os.tmpdir(), (text) => output.push(text),
+    );
+    assert.deepStrictEqual(result, {
+      stdout: "stdin reached EOF",
+      stderr: "diagnostic output",
+    });
+    assert.ok(output.join("").includes(result.stdout));
+    assert.ok(output.join("").includes(result.stderr));
+  });
+});
+
+describe("MLIA environment discovery", () => {
+  it("returns targets and all package versions together", () => {
+    assert.deepStrictEqual(parseMliaEnvironment(environmentDiscovery()), {
+      targets: parseMliaTargets(JSON.stringify(targetDiscovery())), packageVersions,
+    });
+    for (const response of ["not json", "[]", '{}', '{"targets":[],"packageVersions":{"mlia":""}}']) {
+      assert.throws(() => parseMliaEnvironment(response), /MLIA environment query/);
+    }
+  });
+
+  it("discovers real distribution metadata without importing optional MLIA packages", async () => {
+    const fixture = await makeFixture();
+    const modules = path.join(fixture.extensionPath, "discovery-fixture");
+    await fs.mkdir(path.join(modules, "mlia"), { recursive: true });
+    await fs.writeFile(path.join(modules, "mlia", "__init__.py"), "");
+    await fs.writeFile(path.join(modules, "mlia", "api.py"), "def list_targets(): return []\n");
+    for (const [name, version] of [["mlia", "1.2.3"], ["MLIA_Neural.Technology", "2.0.0"], ["requests", "3.0.0"]]) {
+      const info = path.join(modules, `${name}-${version}.dist-info`);
+      await fs.mkdir(info);
+      await fs.writeFile(path.join(info, "METADATA"), `Metadata-Version: 2.1\nName: ${name}\nVersion: ${version}\n`);
+    }
+    const runCommand: CommandRunner = (_command, args, cwd, output, options) => defaultCommandRunner(
+      process.env.PYTHON ?? "uv",
+      process.env.PYTHON ? ["-S", ...args.slice(2)] : ["run", "--no-project", "python", "-S", ...args.slice(2)],
+      cwd, output, options,
+    );
+    const details = await queryMliaEnvironment(modules, "uv", runCommand, {}, { PYTHONPATH: modules });
+    assert.deepStrictEqual(details, { targets: [], packageVersions });
+  });
 });
 
 describe("parseMliaTargets", () => {
@@ -153,7 +240,7 @@ describe("refreshPythonRuntime", () => {
         return { stdout: "MLIA 1.2.3\n", stderr: "" };
       }
       if (args.includes("-c")) {
-        return { stdout: JSON.stringify(targetDiscovery()), stderr: "" };
+        return { stdout: environmentDiscovery(), stderr: "" };
       }
       return { stdout: "", stderr: "" };
     };
@@ -166,13 +253,15 @@ describe("refreshPythonRuntime", () => {
       runtimeDir: path.join(fixture.globalStoragePath, "python"),
       version: "MLIA 1.2.3",
       targets: parseMliaTargets(JSON.stringify(targetDiscovery())),
+      packageVersions,
     });
-    assert.deepStrictEqual(calls, [
+    assert.deepStrictEqual(calls.slice(0, 3), [
       `uv venv ${path.join(fixture.globalStoragePath, "python", ".venv")}`,
       "uv sync",
       "uv run mlia --version",
-      "uv run python -c import json; from mlia.api import list_targets; print(json.dumps(list_targets()))",
     ]);
+    assert.strictEqual(calls.length, 4);
+    assert.ok(calls[3].startsWith("uv run python -c "));
   });
 
   it("puts the bundled flat index before development indexes and retains remote fallback", async () => {
@@ -188,7 +277,7 @@ describe("refreshPythonRuntime", () => {
       if (args[0] === "sync") {
         generated.push(await fs.readFile(path.join(cwd, "pyproject.toml"), "utf8"));
       }
-      return { stdout: args.includes("-c") ? "[]" : "MLIA test", stderr: "" };
+      return { stdout: args.includes("-c") ? environmentDiscovery([]) : "MLIA test", stderr: "" };
     };
     const result = await refreshPythonRuntime({ ...fixture, runCommand, log: (text) => logs.push(text) });
     assert.strictEqual(result.ok, true);
@@ -206,7 +295,7 @@ describe("refreshPythonRuntime", () => {
     const wheelhouse = path.join(resources, "wheelhouse");
     await fs.mkdir(wheelhouse);
     const runCommand: CommandRunner = async (_command, args) => ({
-      stdout: args.includes("-c") ? "[]" : "MLIA test", stderr: "",
+      stdout: args.includes("-c") ? environmentDiscovery([]) : "MLIA test", stderr: "",
     });
     assert.strictEqual((await refreshPythonRuntime({ ...fixture, runCommand })).ok, true);
     await fs.rmdir(wheelhouse);
@@ -225,7 +314,7 @@ describe("refreshPythonRuntime", () => {
     const wheelhouse = path.join(resources, "wheelhouse");
     await fs.mkdir(wheelhouse);
     const result = await refreshPythonRuntime({ ...fixture, extensionPath, runCommand: async (_command, args) => ({
-      stdout: args.includes("-c") ? "[]" : "MLIA test", stderr: "",
+      stdout: args.includes("-c") ? environmentDiscovery([]) : "MLIA test", stderr: "",
     }) });
     assert.strictEqual(result.ok, true);
     assert.strictEqual(
@@ -265,7 +354,7 @@ describe("refreshPythonRuntime", () => {
         retained.push(await fs.stat(lock).then(() => true, () => false));
         await fs.writeFile(lock, "test-generated lock");
       }
-      return { stdout: args.includes("-c") ? "[]" : "MLIA test", stderr: "" };
+      return { stdout: args.includes("-c") ? environmentDiscovery([]) : "MLIA test", stderr: "" };
     };
     const refresh = async () => assert.strictEqual((await refreshPythonRuntime({ ...fixture, runCommand })).ok, true);
     await refresh();
@@ -290,7 +379,7 @@ describe("refreshPythonRuntime", () => {
         return { stdout: "MLIA 1.2.3\n", stderr: "" };
       }
       if (args.includes("-c")) {
-        return { stdout: JSON.stringify(targetDiscovery(["ethos-u55"])), stderr: "" };
+        return { stdout: environmentDiscovery(["ethos-u55"]), stderr: "" };
       }
       return { stdout: "", stderr: "" };
     };
@@ -298,11 +387,12 @@ describe("refreshPythonRuntime", () => {
     const result = await refreshPythonRuntime({ ...fixture, runCommand });
 
     assert.strictEqual(result.ok, true);
-    assert.deepStrictEqual(calls, [
+    assert.deepStrictEqual(calls.slice(0, 2), [
       "uv sync --reinstall",
       "uv run mlia --version",
-      "uv run python -c import json; from mlia.api import list_targets; print(json.dumps(list_targets()))",
     ]);
+    assert.strictEqual(calls.length, 3);
+    assert.ok(calls[2].startsWith("uv run python -c "));
   });
 
   it("deletes the existing runtime directory when forceRecreateVenv is set", async () => {
@@ -322,7 +412,7 @@ describe("refreshPythonRuntime", () => {
         return { stdout: "MLIA 1.2.3\n", stderr: "" };
       }
       if (args.includes("-c")) {
-        return { stdout: JSON.stringify(targetDiscovery(["ethos-u55"])), stderr: "" };
+        return { stdout: environmentDiscovery(["ethos-u55"]), stderr: "" };
       }
       return { stdout: "", stderr: "" };
     };
@@ -348,7 +438,7 @@ describe("refreshPythonRuntime", () => {
         return { stdout: "MLIA 1.2.3\n", stderr: "" };
       }
       if (args.includes("-c")) {
-        return { stdout: "[]", stderr: "" };
+        return { stdout: JSON.stringify({ targets: [], packageVersions }), stderr: "" };
       }
       return { stdout: "", stderr: "" };
     };
@@ -361,6 +451,7 @@ describe("refreshPythonRuntime", () => {
       runtimeDir: path.join(fixture.globalStoragePath, "python"),
       version: "MLIA 1.2.3",
       targets: [],
+      packageVersions,
     });
   });
 
@@ -448,7 +539,110 @@ describe("getEntityNodeMappingsPath", () => {
   });
 });
 
+describe("queryMliaEulaText", () => {
+  it("reads terms using the managed runtime and the mapped Python property", async () => {
+    const fixture = await makeFixture();
+    const definition = requiredEula("neural-technology", "estimation")!;
+    const text = "Licence text: café < & >\nsecond line";
+    const calls: unknown[] = [];
+    assert.strictEqual(await queryMliaEulaText({
+      ...fixture,
+      uvExecutable: undefined,
+      definition,
+      packageVersion: "2.0.0",
+      runCommand: async (command, args, cwd, _output, options) => {
+        calls.push({ command, prefix: args.slice(0, 3), source: args.slice(-3), cwd, env: options?.env });
+        return { stdout: JSON.stringify({ text, packageVersion: "2.0.0" }), stderr: "" };
+      },
+    }), text);
+    assert.deepStrictEqual(calls, [{
+      command: getManagedUvPath(fixture.globalStoragePath),
+      prefix: ["run", "python", "-c"],
+      source: [definition.pythonModule, definition.pythonProperty, definition.packageName],
+      cwd: path.join(fixture.globalStoragePath, "python"),
+      env: { ...managedUvEnvironment(fixture.globalStoragePath), PYTHONIOENCODING: "utf-8", PYTHONUTF8: "1" },
+    }]);
+  });
+
+  it("rejects malformed or empty licence responses", async () => {
+    const fixture = await makeFixture();
+    for (const stdout of ["not json", "null", "{}", '{"text":123}', '{"text":"  "}']) {
+      await assert.rejects(queryMliaEulaText({
+        ...fixture,
+        definition: requiredEula("neural-technology", "estimation")!,
+        packageVersion: "2.0.0",
+        runCommand: async () => ({ stdout, stderr: "" }),
+      }), /Unable to read.*EULA/);
+    }
+  });
+
+  it("executes the real query against a Python module and reports a missing licence", async () => {
+    const fixture = await makeFixture();
+    const runtime = path.join(fixture.globalStoragePath, "python");
+    const moduleDir = path.join(fixture.extensionPath, "test-modules");
+    await fs.mkdir(runtime, { recursive: true });
+    await fs.mkdir(moduleDir);
+    const distInfo = path.join(moduleDir, "fixture_eula-2.0.0.dist-info");
+    await fs.mkdir(distInfo);
+    await fs.writeFile(path.join(distInfo, "METADATA"), "Metadata-Version: 2.1\nName: fixture-eula\nVersion: 2.0.0\n");
+    await fs.writeFile(path.join(moduleDir, "fixture_eula.py"),
+      'from pathlib import Path\nTERMS_FILE = Path(__file__).with_name("terms.txt")\n');
+    const terms = path.join(moduleDir, "terms.txt");
+    await fs.writeFile(terms, "Actual fixture terms: café\n");
+    await fs.writeFile(path.join(fixture.extensionPath, "resources", "python-runtime", ".env"),
+      `PYTHONPATH=${moduleDir}\n`);
+    const options = {
+      ...fixture,
+      packageVersion: "2.0.0",
+      definition: {
+        ...requiredEula("neural-technology", "estimation")!,
+        packageName: "fixture-eula",
+        pythonModule: "fixture_eula",
+        pythonProperty: "TERMS_FILE",
+      },
+      runCommand: ((_command, args, cwd, output, settings) => defaultCommandRunner(
+        process.env.PYTHON ?? "uv",
+        process.env.PYTHON ? args.slice(2) : ["run", "--no-project", ...args.slice(1)],
+        cwd, output, settings,
+      )) as CommandRunner,
+    };
+    assert.strictEqual(await queryMliaEulaText(options), "Actual fixture terms: café\n");
+    await assert.rejects(queryMliaEulaText({ ...options, packageVersion: "1.0.0" }), /differs from the cached version/);
+    await fs.rm(terms);
+    await assert.rejects(queryMliaEulaText(options), /Unable to read.*EULA/);
+  });
+});
+
 describe("runMliaCheckPerformance", () => {
+  for (const [accepted, extraArgs, expectedCount] of [
+    [false, [], 0],
+    [true, [], 1],
+    [false, ["--i-agree-to-the-contained-eula"], 1],
+  ] as const) {
+    it(`adds EULA acceptance only from consent or explicit user arguments (${accepted}, ${extraArgs.length})`, async () => {
+      const fixture = await makeFixture();
+      const outputDir = path.join(fixture.globalStoragePath, "run");
+      await fs.mkdir(outputDir, { recursive: true });
+      let launched: string[] = [];
+      await runMliaCheckPerformance({
+        ...fixture, outputDir,
+        modelPath: "model.tflite", profilingDataPaths: [], targetProfile: "neural-technology",
+        analysisOptions: { performance: true, compatibility: false }, configContent: "",
+        acceptEula: accepted, extraArgs,
+        startCommand: (_command, args) => {
+          launched = args;
+          return { stdout: () => "", stderr: () => "", stop: () => undefined,
+            wait: async () => ({ exitCode: 1, stdout: "", stderr: "test launch only" }) };
+        },
+      });
+      assert.ok(launched.includes("--noninteractive"));
+      assert.strictEqual(launched.filter((arg) => arg === "--i-agree-to-the-contained-eula").length, expectedCount);
+      if (extraArgs.length) {
+        assert.deepStrictEqual(launched.slice(-extraArgs.length), [...extraArgs]);
+      }
+    });
+  }
+
   it("uses the already allocated persistent output directory and waits for generated HTML", async () => {
     const fixture = await makeFixture();
     await fs.writeFile(
@@ -533,6 +727,7 @@ describe("runMliaCheckPerformance", () => {
       "--model-explorer",
       "files",
       "--debug",
+      "--noninteractive",
       "--foo",
       "bar value",
     ]]);
@@ -618,6 +813,39 @@ describe("runMliaCheckPerformance", () => {
       ],
     );
     assert.deepStrictEqual(launchedArgs.slice(-extraArgs.length), extraArgs);
+    assert.ok(launchedArgs.includes("--noninteractive"));
+    assert.ok(!launchedArgs.includes("--i-agree-to-the-contained-eula"));
+    assert.ok(!launchedArgs.includes("--accept-eula"));
+  });
+
+  it("turns EULA-required errors into extension guidance while retaining raw log output", async () => {
+    const fixture = await makeFixture();
+    const outputDir = path.join(fixture.globalStoragePath, "run");
+    await fs.mkdir(outputDir, { recursive: true });
+    for (const summary of [
+      "EULA acceptance required for one or more backends. Pass accept_eula=True to proceed.",
+      "EULA acceptance required for backend(s): nx-performance-estimator. Pass accept_eula=True (or --accept-eula in the CLI) to proceed.",
+    ]) {
+      const stderr = `MLIA_WATCHDOG_ERROR_SUMMARY: ${summary}`;
+      const logs: string[] = [];
+      const result = await runMliaCheckPerformance({
+        ...fixture, outputDir,
+        modelPath: "model.tflite", profilingDataPaths: [], targetProfile: "neural-technology",
+        analysisOptions: { performance: true, compatibility: false }, configContent: "",
+        log: (text) => logs.push(text),
+        startCommand: (_command, _args, _cwd, output) => {
+          output(stderr);
+          return { stdout: () => "", stderr: () => stderr, stop: () => undefined,
+            wait: async () => ({ exitCode: 1, stdout: "", stderr }) };
+        },
+      });
+      assert.strictEqual(result.ok, false);
+      if (!result.ok) {
+        assert.strictEqual(result.message,
+          "EULA acceptance is required. Run the analysis again and accept the EULA to continue.");
+      }
+      assert.ok(logs.join("\n").includes(summary));
+    }
   });
 
   it("uses the watchdog error summary from the final stderr line", async () => {

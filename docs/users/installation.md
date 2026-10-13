@@ -50,6 +50,10 @@ The first refresh may take longer while the required tools and packages are down
 
 The extension stores this environment in its VS Code global storage area. It does not modify your project environment or an existing Python virtual environment.
 
+## Installed package versions
+
+Select **Show MLIA Information** in the New Analysis title bar to see the installed versions of `mlia` and all `mlia-*` packages. This list is cached during **Refresh MLIA Environment**, so opening Info does not launch Python. Refresh after changing packages outside the extension.
+
 ## Refresh or repair the environment
 
 Select **Refresh MLIA Environment** from the New Analysis title bar when:

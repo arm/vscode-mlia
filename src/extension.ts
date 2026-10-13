@@ -13,6 +13,9 @@ import {
 } from "./analysisLifecycle";
 import { checkPerformance } from "./checkPerformance";
 import { showAnalysisProgress } from "./analysisProgress";
+import { acceptedEulasSetting, EulaAcceptanceManager } from "./eula";
+import { EulaPromptController } from "./eulaView";
+import { formatMliaPackageVersions, readMliaPackageVersions } from "./mliaPackageVersions";
 import { CurrentAnalysisViewProvider } from "./currentAnalysisView";
 import {
   classifyManagedEnvironment,
@@ -31,6 +34,7 @@ import {
   MliaAnalysisOptions,
   MliaTarget,
   refreshPythonRuntime,
+  queryMliaEulaText,
   RunningCommand,
   startMliaCheckPerformance,
 } from "./pythonRuntime";
@@ -66,6 +70,7 @@ const outputChannel = vscode.window.createOutputChannel("MLIA", { log: true });
 const targetsCacheKey = "mlia.targets";
 const obsoleteTargetProfileGroupsCacheKey = "mlia.targetProfileGroups";
 const versionCacheKey = "mlia.version";
+const packageVersionsCacheKey = "mlia.packageVersions";
 const analysisInputsStateKey = "mlia.analysisInputs";
 const targetProfileSetting = "targetProfile";
 const configFileContentsSetting = "configFileContents";
@@ -91,6 +96,28 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   });
   const analysisStoreReady = analysisStore.load();
   const runningCommands = new Map<string, RunningCommand>();
+  const eulaPrompts = new EulaPromptController({
+    createWebviewPanel: vscode.window.createWebviewPanel,
+    viewColumn: vscode.ViewColumn.Active,
+  });
+  context.subscriptions.push(eulaPrompts);
+  const eulaAcceptance = new EulaAcceptanceManager({
+    readAcceptances: () => vscode.workspace.getConfiguration("vscode-mlia").get(acceptedEulasSetting, {}),
+    writeAcceptances: (acceptances) => vscode.workspace.getConfiguration("vscode-mlia").update(
+      acceptedEulasSetting, acceptances, vscode.ConfigurationTarget.Global,
+    ),
+    getPackageVersion: (packageName) => newAnalysisState.kind === "ready"
+      ? readMliaPackageVersions(context.globalState.get(packageVersionsCacheKey))?.[packageName]
+      : undefined,
+    loadText: (definition, packageVersion) => queryMliaEulaText({
+      extensionPath: context.extensionPath,
+      globalStoragePath: context.globalStorageUri.fsPath,
+      definition,
+      packageVersion,
+      log: logLine,
+    }),
+    prompt: (agreement) => eulaPrompts.show(agreement),
+  });
   const analysesProvider = new AnalysesTreeProvider(analysisStore);
   let currentAnalysisInputs = storedAnalysisInputs(context);
   let newAnalysisState: NewAnalysisState = { kind: "starting" };
@@ -458,8 +485,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const showMliaInfoCommand = vscode.commands.registerCommand(
     "vscode-mlia.showMliaInfo",
     () => {
-      const detail = newAnalysisState.kind === "ready"
-        ? `Version: ${newAnalysisState.version}`
+      const packageVersions = readMliaPackageVersions(context.globalState.get(packageVersionsCacheKey));
+      const detail = newAnalysisState.kind === "ready" && packageVersions
+        ? formatMliaPackageVersions(packageVersions)
         : "Version information is unavailable. Refresh the MLIA environment to query it.";
       return vscode.window.showInformationMessage("MLIA information", { modal: true, detail });
     },
@@ -486,6 +514,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           analysisStore,
           panelManager,
           runningCommands,
+          eulaAcceptance,
           currentAnalysisInputs,
           options,
         ),
@@ -632,6 +661,8 @@ async function refreshPythonVenvCommand(
   forceRecreateVenv = false,
 ): Promise<void> {
   setState({ kind: "refreshing" });
+  // A failed refresh must not leave old package versions eligible for consent.
+  await context.globalState.update(packageVersionsCacheKey, undefined);
   const result = await vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
@@ -657,6 +688,11 @@ async function refreshPythonVenvCommand(
     return;
   }
 
+  await Promise.all([
+    context.globalState.update(targetsCacheKey, result.targets),
+    context.globalState.update(versionCacheKey, result.version),
+    context.globalState.update(packageVersionsCacheKey, result.packageVersions),
+  ]);
   setState({
     kind: "ready",
     version: result.version,
@@ -666,10 +702,6 @@ async function refreshPythonVenvCommand(
     analysisOptions: defaultAnalysisOptions,
     analysisInputs,
   });
-  await Promise.all([
-    context.globalState.update(targetsCacheKey, result.targets),
-    context.globalState.update(versionCacheKey, result.version),
-  ]);
   const targetProfiles = result.targets.flatMap(({ profiles }) => profiles);
   logLine(`Cached ${targetProfiles.length} MLIA target profile(s): ${targetProfiles.join(", ")}`);
 
@@ -686,6 +718,7 @@ async function initializeEnvironmentState(
   analysisInputs: AnalysisInputs,
 ): Promise<void> {
   const cachedVersion = context.globalState.get<string>(versionCacheKey);
+  const cachedPackageVersions = readMliaPackageVersions(context.globalState.get(packageVersionsCacheKey));
   const cachedTargets = context.globalState.get<MliaTarget[]>(targetsCacheKey, []);
   const venvPath = vscode.Uri.file(`${getPythonRuntimeDir(context.globalStorageUri.fsPath)}/.venv`);
   const uvPath = vscode.Uri.file(getManagedUvPath(context.globalStorageUri.fsPath));
@@ -717,7 +750,7 @@ async function initializeEnvironmentState(
   }
 
   setState(
-    cachedVersion && cachedTargets.length > 0
+    cachedVersion && cachedPackageVersions && cachedTargets.length > 0
       ? {
           kind: "ready",
           version: cachedVersion,
@@ -743,19 +776,26 @@ async function checkPerformanceCommandHandler(
   analysisStore: AnalysisStore,
   panelManager: AnalysisPanelManager,
   runningCommands: Map<string, RunningCommand>,
+  eulaAcceptance: EulaAcceptanceManager,
   defaultAnalysisInputs: AnalysisInputs,
   options?: RunAnalysisCommandOptions,
 ): Promise<void> {
+  const analysisInputs = options?.analysisInputs ?? defaultAnalysisInputs;
+  const analysisMode = options?.analysisMode ?? (
+    analysisInputs.profilingDataPaths.length > 0 ? "profiling" : "estimation"
+  );
   await checkPerformance({
     targetProfile: options?.targetProfile ?? getTargetProfile(),
     analysisOptions: options?.analysisOptions ?? defaultAnalysisOptions,
-    analysisInputs: options?.analysisInputs ?? defaultAnalysisInputs,
+    analysisInputs,
+    analysisMode,
+    authorizeEula: (targetProfile, mode) => eulaAcceptance.authorize(targetProfile, mode),
     showMissingTargetProfile: async () => {
       await vscode.window.showWarningMessage(
         "Select a target profile in the New Analysis view before running an analysis.",
       );
     },
-    runMliaCheckPerformance: async (analysisInputs, selectedTargetProfile, analysisOptions) => {
+    runMliaCheckPerformance: async (analysisInputs, selectedTargetProfile, analysisOptions, acceptEula) => {
       const result = await startAnalysis({
         store: analysisStore,
         panels: panelManager,
@@ -763,9 +803,7 @@ async function checkPerformanceCommandHandler(
         modelPath: analysisInputs.modelPath,
         profilingDataPaths: analysisInputs.profilingDataPaths,
         targetProfile: selectedTargetProfile,
-        analysisMode: options?.analysisMode ?? (
-          analysisInputs.profilingDataPaths.length > 0 ? "profiling" : "estimation"
-        ),
+        analysisMode,
         analysisOptions,
         autoOpen: isSettingEnabled(autoOpenModelExplorerSetting),
         start: (analysis) => {
@@ -778,6 +816,7 @@ async function checkPerformanceCommandHandler(
             analysisOptions,
             configContent: getConfigFileContents(),
             extraArgs: getExtraCommandLineArgs(),
+            acceptEula,
             outputDir: analysis.analysisDir,
             log: logLine,
           });

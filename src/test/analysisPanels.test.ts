@@ -238,6 +238,18 @@ function resolveCall(state: ReturnType<typeof fixture>, index: number, marker = 
 }
 
 describe("AnalysisPanelManager", () => {
+  it("shows EULA retry guidance for both live and reopened failures", async () => {
+    const raw = "EULA acceptance required for one or more backends. Pass accept_eula=True to proceed.";
+    const friendly = "EULA acceptance is required. Run the analysis again and accept the EULA to continue.";
+    const state = fixture();
+    const failed = { ...failedAnalysis(), error: raw };
+    await state.manager.open(failed, "preserve");
+    assert.strictEqual(state.errors[0]?.message, friendly);
+    state.manager.showError(failed.id, raw);
+    assert.strictEqual(state.errors[1]?.message, friendly);
+    assert.strictEqual(failed.error, raw);
+  });
+
   it("opens selected incomplete runs without trying to load results", async () => {
     for (const status of ["running", "cancelled", "interrupted"] as const) {
       const state = fixture();

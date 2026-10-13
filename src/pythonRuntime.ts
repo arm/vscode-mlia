@@ -4,6 +4,9 @@ import * as fsSync from "fs";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { pathToFileURL } from "url";
+import type { EulaDefinition } from "./eula";
+import { analysisErrorMessage } from "./analysisErrors";
+import { MliaPackageVersions, readMliaPackageVersions } from "./mliaPackageVersions";
 
 import {
   ensureManagedUv,
@@ -92,6 +95,7 @@ export type RefreshPythonRuntimeResult =
       runtimeDir: string;
       version: string;
       targets: MliaTarget[];
+      packageVersions: MliaPackageVersions;
     }
   | {
       ok: false;
@@ -131,6 +135,7 @@ export interface MliaCheckPerformanceOptions {
   analysisOptions: MliaAnalysisOptions;
   configContent: string;
   extraArgs?: readonly string[];
+  acceptEula?: boolean;
   uvExecutable?: string;
   runCommand?: CommandRunner;
   startCommand?: LongRunningCommandStarter;
@@ -219,8 +224,8 @@ export async function refreshPythonRuntime(
     const version = await runRuntimeCommand(runCommand, uvExecutable, ["run", "mlia", "--version"], runtimeDir, options, runtimeEnv);
 
     stage = "queryTargets";
-    progress(options, "Querying MLIA target profiles");
-    const targets = await queryMliaTargets(runtimeDir, uvExecutable, runCommand, options, runtimeEnv);
+    progress(options, "Querying MLIA target profiles and package versions");
+    const { targets, packageVersions } = await queryMliaEnvironment(runtimeDir, uvExecutable, runCommand, options, runtimeEnv);
     await fs.writeFile(path.join(runtimeDir, runtimeInputsFileName), runtimeInputs.fingerprint, "utf8");
     const targetProfiles = targets.flatMap(({ profiles }) => profiles);
     log(options, `Found ${targetProfiles.length} MLIA target profile(s): ${targetProfiles.join(", ")}`);
@@ -231,6 +236,7 @@ export async function refreshPythonRuntime(
       runtimeDir,
       version: version.stdout.trim(),
       targets,
+      packageVersions,
     };
   } catch (error) {
     return failureResult(error, runtimeDir, stage);
@@ -301,6 +307,8 @@ export function startMliaCheckPerformance(options: MliaCheckPerformanceOptions):
     "--model-explorer",
     "files",
     "--debug",
+    "--noninteractive",
+    ...(options.acceptEula ? ["--i-agree-to-the-contained-eula"] : []),
     ...(options.extraArgs ?? []),
   ];
   const args = [
@@ -537,20 +545,108 @@ async function writeRuntimePyproject(
   return { fingerprint, changed };
 }
 
-async function queryMliaTargets(
+export interface QueryMliaEulaOptions {
+  extensionPath: string;
+  globalStoragePath: string;
+  definition: EulaDefinition;
+  packageVersion: string;
+  uvExecutable?: string;
+  runCommand?: CommandRunner;
+  log?: (message: string) => void;
+}
+
+export async function queryMliaEulaText(options: QueryMliaEulaOptions): Promise<string> {
+  const { definition } = options;
+  const runtimeDir = getPythonRuntimeDir(options.globalStoragePath);
+  const uvExecutable = options.uvExecutable ?? getManagedUvPath(options.globalStoragePath);
+  const runCommand = options.runCommand ?? defaultCommandRunner;
+  const pythonSnippet = [
+    "import importlib, json, sys",
+    "from pathlib import Path",
+    "from importlib.metadata import version",
+    "package_version = version(sys.argv[3])",
+    "module = importlib.import_module(sys.argv[1])",
+    "license_file = Path(getattr(module, sys.argv[2]))",
+    "print(json.dumps({'text': license_file.read_text(encoding='utf-8'), 'packageVersion': package_version}))",
+  ].join("; ");
+  try {
+    const env = {
+      ...await readRuntimeEnv(options.extensionPath, options),
+      ...managedUvEnvironment(options.globalStoragePath),
+      PYTHONIOENCODING: "utf-8",
+      PYTHONUTF8: "1",
+    };
+    log(options, `Reading ${definition.title} licence from the managed MLIA environment`);
+    const result = await runCommand(
+      uvExecutable,
+      ["run", "python", "-c", pythonSnippet, definition.pythonModule, definition.pythonProperty, definition.packageName],
+      runtimeDir,
+      () => undefined,
+      { env },
+    );
+    const response: unknown = JSON.parse(result.stdout);
+    if (typeof response !== "object" || response === null ||
+        typeof (response as { text?: unknown }).text !== "string") {
+      throw new Error("Licence query did not return text.");
+    }
+    if ((response as { packageVersion?: unknown }).packageVersion !== options.packageVersion) {
+      throw new Error("The installed package version differs from the cached version.");
+    }
+    const text = (response as { text: string }).text;
+    if (!text.trim()) {
+      throw new Error("Licence text is empty.");
+    }
+    return text;
+  } catch (error) {
+    if (error instanceof CommandExecutionError && error.stderr) {
+      log(options, error.stderr);
+    }
+    throw new Error(
+      `Unable to read the ${definition.title} EULA. Refresh MLIA Environment and try again. ${errorMessage(error)}`,
+    );
+  }
+}
+
+export interface MliaEnvironmentDetails {
+  targets: MliaTarget[];
+  packageVersions: MliaPackageVersions;
+}
+
+export async function queryMliaEnvironment(
   runtimeDir: string,
   uvExecutable: string,
   runCommand: CommandRunner,
-  options: RefreshPythonRuntimeOptions,
+  options: { log?: (message: string) => void },
   env: Record<string, string>,
-): Promise<MliaTarget[]> {
+): Promise<MliaEnvironmentDetails> {
   const pythonSnippet = [
-    "import json",
+    "import json, re",
+    "from importlib.metadata import distributions",
     "from mlia.api import list_targets",
-    "print(json.dumps(list_targets()))",
+    "normalize = lambda name: re.sub(r'[-_.]+', '-', name).lower()",
+    "versions = {normalize(d.metadata['Name']): d.version for d in distributions() if d.metadata.get('Name') and (normalize(d.metadata['Name']) == 'mlia' or normalize(d.metadata['Name']).startswith('mlia-'))}",
+    "print(json.dumps({'targets': list_targets(), 'packageVersions': versions}))",
   ].join("; ");
   const result = await runRuntimeCommand(runCommand, uvExecutable, ["run", "python", "-c", pythonSnippet], runtimeDir, options, env);
-  return parseMliaTargets(result.stdout);
+  return parseMliaEnvironment(result.stdout);
+}
+
+export function parseMliaEnvironment(output: string): MliaEnvironmentDetails {
+  let value: unknown;
+  try {
+    value = JSON.parse(output);
+  } catch (error) {
+    throw new TargetProfileJsonError(`MLIA environment query returned invalid JSON: ${errorMessage(error)}`);
+  }
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new TargetProfileJsonError("MLIA environment query returned unexpected JSON");
+  }
+  const response = value as { targets?: unknown; packageVersions?: unknown };
+  const packageVersions = readMliaPackageVersions(response.packageVersions);
+  if (!packageVersions) {
+    throw new TargetProfileJsonError("MLIA environment query returned invalid package versions");
+  }
+  return { targets: parseMliaTargets(JSON.stringify(response.targets)), packageVersions };
 }
 
 export function parseMliaTargets(output: string): MliaTarget[] {
@@ -735,6 +831,8 @@ export function defaultLongRunningCommandStarter(
   const child = childProcess.spawn(command, args, {
     cwd,
     env: { ...process.env, ...options.env },
+    // Background commands have no input UI. Unexpected prompts must see EOF.
+    stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   });
 
@@ -812,7 +910,7 @@ function mliaFailureMessage(stderr: string, exitCode: number | null): string {
   if (finalLine?.startsWith(watchdogErrorSummaryPrefix)) {
     const summary = finalLine.slice(watchdogErrorSummaryPrefix.length).trim();
     if (summary) {
-      return summary;
+      return analysisErrorMessage(summary);
     }
   }
   return `MLIA exited with code ${exitCode ?? "unknown"}. No error summary was provided.`;

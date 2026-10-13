@@ -52,6 +52,17 @@ Default: empty
 
 Stores the target profile used for new analyses. Select the profile from New Analysis after refreshing the environment. Existing and running analyses are unaffected by changes.
 
+## Licence acceptance
+
+<a id="accepted-eulas"></a>
+### `vscode-mlia.acceptedEulas`
+
+Default: `{}`
+
+Lists accepted EULAs as a map from `<agreement-id>:<providing-package-version>` to an acceptance timestamp. **Accept and Run** fills this setting in automatically. It is stored in user settings on this machine, is unavailable in workspace settings, and is excluded from Settings Sync.
+
+Delete a row to require acceptance of those terms again, or use **Reset Setting** to clear all acceptances. Changes take effect on the next applicable run without restarting VS Code. Manually adding valid entries grants acceptance without showing the licence prompt.
+
 ## Advanced MLIA configuration
 
 <a id="extra-command-line-args"></a>

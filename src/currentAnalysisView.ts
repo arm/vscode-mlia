@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import * as vscode from "vscode";
 
 import { analysisPresentation } from "./analysisPresentation";
+import { analysisErrorMessage } from "./analysisErrors";
 import { Analysis } from "./analysisStore";
 import { formatDisplayNumber } from "./numberFormatting";
 import {
@@ -336,7 +337,7 @@ function currentAnalysisContent(state: CurrentAnalysisState): string {
     ? `${presentation.status} · ${formatDate(analysis.finishedAt)}`
     : presentation.status;
   const errorRow = analysis.error
-    ? `<dt>Details</dt><dd>${escapeHtml(analysis.error)}</dd>`
+    ? `<dt>Details</dt><dd>${escapeHtml(analysisErrorMessage(analysis.error))}</dd>`
     : "";
   const inputRows = [
     analysis.modelPath

@@ -152,6 +152,22 @@ describe("MLIA views", () => {
 });
 
 describe("MLIA settings", () => {
+  it("exposes accepted EULAs as an editable machine-scoped string map", () => {
+    assert.deepStrictEqual(
+      manifest.contributes.configuration.properties["vscode-mlia.acceptedEulas"],
+      {
+        type: "object",
+        additionalProperties: { type: "string" },
+        default: {},
+        scope: "machine",
+        description:
+          "Accepted EULAs, keyed by agreement ID and the providing MLIA package version, with acceptance timestamps as values. " +
+          "Accept and Run adds entries here. Delete an entry to require acceptance again, or reset this setting to clear all acceptances. " +
+          "Manually adding valid entries grants acceptance without a prompt. Stored in user settings on this machine and excluded from Settings Sync.",
+      },
+    );
+  });
+
   it("declares independent window-scoped Model Explorer and source overlay settings", () => {
     assert.deepStrictEqual(
       Object.fromEntries(
@@ -246,7 +262,8 @@ describe("MLIA settings", () => {
         scope: "window",
         description:
           "Extra command-line arguments appended unchanged to MLIA analyses started by VS Code. " +
-          "Intended for advanced users.",
+          "Intended for advanced users. These arguments can cause unexpected behaviour in the VS Code integration. " +
+          "These arguments may also cause EULAs to be accepted without being shown to you, including when they change which backend is used.",
       },
     );
   });

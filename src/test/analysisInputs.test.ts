@@ -69,5 +69,11 @@ describe("analysis input formatting", () => {
       ],
       panelTitle: "MLIA: model.vgf · Profiling · profile-a",
     });
+    assert.strictEqual(analysisPresentation({
+      ...analysis,
+      status: "failed",
+      error: "EULA acceptance required for one or more backends. Pass accept_eula=True to proceed.",
+    }).tooltipDetails.at(-1),
+    "Details: EULA acceptance is required. Run the analysis again and accept the EULA to continue.");
   });
 });

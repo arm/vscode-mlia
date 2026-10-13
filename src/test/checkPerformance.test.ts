@@ -11,6 +11,8 @@ function successfulCheckResult(): MliaCheckPerformanceResult {
 function makeOptions(overrides: Partial<Parameters<typeof checkPerformance>[0]> = {}): Parameters<typeof checkPerformance>[0] {
   return {
     targetProfile: "neural-technology",
+    analysisMode: "estimation",
+    authorizeEula: async () => ({ proceed: true, acceptEula: false }),
     analysisOptions: { performance: true, compatibility: false },
     analysisInputs: { modelPath: "C:/models/model.tflite", profilingDataPaths: [] },
     showMissingTargetProfile: async () => undefined,
@@ -23,6 +25,81 @@ function makeOptions(overrides: Partial<Parameters<typeof checkPerformance>[0]> 
 }
 
 describe("checkPerformance", () => {
+  for (const acceptEula of [false, true]) {
+    it(`passes the EULA decision to launch (acceptEula=${acceptEula})`, async () => {
+      const requests: unknown[] = [];
+      const launches: boolean[] = [];
+      await checkPerformance(makeOptions({
+        analysisMode: "profiling",
+        authorizeEula: async (profile, mode) => {
+          requests.push([profile, mode]);
+          return { proceed: true, acceptEula };
+        },
+        runMliaCheckPerformance: async (_inputs, _profile, _checks, accepted) => {
+          launches.push(accepted);
+          return successfulCheckResult();
+        },
+      }));
+      assert.deepStrictEqual(requests, [["neural-technology", "profiling"]]);
+      assert.deepStrictEqual(launches, [acceptEula]);
+    });
+  }
+
+  it("shows EULA retry guidance without launching when consent is cancelled", async () => {
+    const messages: string[] = [];
+    await checkPerformance(makeOptions({
+      authorizeEula: async () => ({ proceed: false }),
+      runMliaCheckPerformance: async () => { throw new Error("must not launch"); },
+      showErrorMessage: async (message) => { messages.push(message); return undefined; },
+    }));
+    assert.deepStrictEqual(messages, [
+      "EULA acceptance is required. Run the analysis again and accept the EULA to continue.",
+    ]);
+  });
+
+  it("waits for consent before starting the analysis", async () => {
+    let accept!: () => void;
+    let launches = 0;
+    const checking = checkPerformance(makeOptions({
+      authorizeEula: () => new Promise((resolve) => {
+        accept = () => resolve({ proceed: true, acceptEula: true });
+      }),
+      runMliaCheckPerformance: async () => { launches += 1; return successfulCheckResult(); },
+    }));
+    await Promise.resolve();
+    assert.strictEqual(launches, 0);
+    accept();
+    await checking;
+    assert.strictEqual(launches, 1);
+  });
+
+  it("reports licence retrieval or persistence errors without starting a run", async () => {
+    const messages: string[] = [];
+    let shownLog = false;
+    await checkPerformance(makeOptions({
+      authorizeEula: async () => { throw new Error("licence unavailable"); },
+      runMliaCheckPerformance: async () => { throw new Error("must not launch"); },
+      showErrorMessage: async (message) => { messages.push(message); return "Show Log"; },
+      showLog: () => { shownLog = true; },
+    }));
+    assert.deepStrictEqual(messages, ["Unable to start MLIA analysis: licence unavailable"]);
+    assert.strictEqual(shownLog, true);
+  });
+
+  it("validates input before asking for consent", async () => {
+    for (const invalid of [
+      { analysisInputs: { profilingDataPaths: [] } },
+      { targetProfile: undefined },
+      { analysisOptions: { performance: false, compatibility: false } },
+    ]) {
+      await checkPerformance(makeOptions({
+        ...invalid,
+        authorizeEula: async () => { throw new Error("must not request consent"); },
+        showErrorMessage: async () => { throw new Error("unexpected consent error"); },
+      }));
+    }
+  });
+
   it("does nothing when neither input is provided", async () => {
     let ranMlia = false;
     await checkPerformance(makeOptions({
