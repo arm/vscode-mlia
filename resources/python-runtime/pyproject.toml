@@ -3,17 +3,17 @@ name = "vscode-mlia-runtime"
 version = "0.0.0"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "ethos-u-vela",
-    "mlia",
+    "ethos-u-vela==5.2.0",
+    "mlia==0.12.3",
     # Make conversion available without relying on a partner metapackage.
-    "mlia-converters-pytorch",
-    "mlia-converters-litert",
-    "mlia-ethos-u",
-    "mlia-neural-technology",
-    "mlia-model-explorer[vgf,onnx]",
+    "mlia-converters-pytorch==0.1.2",
+    "mlia-converters-litert==0.1.2",
+    "mlia-ethos-u==0.1.1.dev7+4f91c5d",
+    "mlia-neural-technology==0.2.1.dev4+bf150d3",
+    "mlia-model-explorer[vgf,onnx]==0.1.0.dev23+3cccc1b",
     # Declare Torch directly so this runtime can select its package index.
-    # The converter dependency supplies the compatible version constraint.
-    "torch",
+    # Keep this pin aligned with the converter's Torch requirement.
+    "torch==2.13.0+cpu",
 ]
 
 # The converter's published wheel requires Torch but does not carry its uv
