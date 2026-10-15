@@ -101,20 +101,6 @@ Available actions include:
 
 Deleting a run also removes its stored output directory.
 
-## Noninteractive execution
-
-The extension runs analyses with `--noninteractive` and gives all background runtime commands closed stdin. Commands cannot wait for terminal input.
-
-### GCPE licence acceptance
-
-Before an estimation run using `neural-technology`, `NX-peak-12SC-8NX-600MHz`, or `NX-sustained-12SC-8NX-350MHz`, the extension checks whether you have accepted the GCPE EULA for the cached `mlia-neural-technology` package version. Accepted versions start without a Python licence query. Otherwise, the extension reads the licence from the managed environment and opens a **MLIA licence agreement** tab with **Accept and Run** and **Cancel** buttons. Closing the tab also cancels the request. No analysis is started until you accept.
-
-Acceptance is saved in the user-level [Accepted EULAs setting](configuration.md#accepted-eulas), keyed by agreement ID and providing package version. A new package version requires acceptance again, even if its terms are unchanged. Editing licence text without changing the package version does not trigger a new prompt; delete the acceptance entry when testing such changes. If the text cannot be read or acceptance cannot be saved, the analysis does not start and an error is shown.
-
-Package versions are collected during **Refresh MLIA Environment** and reused across restarts. Refresh after changing packages outside the extension. Missing or inconsistent version metadata requires a refresh before a mapped EULA can be accepted.
-
-Once accepted, the extension adds `--i-agree-to-the-contained-eula` to the run. Profiling and unmapped target-profile/mode combinations receive no automatic acceptance flag; MLIA reports an error if they require an outstanding EULA. Advanced arguments remain unchanged, including explicit user-supplied acceptance flags.
-
 ## Advanced arguments
 
 The [`vscode-mlia.extraCommandLineArgs`](configuration.md#extra-command-line-args) setting appends arguments unchanged to the generated `mlia check` command. Use this only when an option is not represented in the extension interface.
