@@ -10,7 +10,7 @@ dependencies = [
     "mlia-converters-litert==0.1.2",
     "mlia-ethos-u==0.2.0",
     "mlia-neural-technology==0.2.1",
-    "mlia-model-explorer[vgf,onnx]==0.1.0.dev23+3cccc1b",
+    "mlia-model-explorer[vgf,onnx]==0.1.1",
     # Declare Torch directly so this runtime can select its package index.
     # Keep this pin aligned with the converter's Torch requirement.
     "torch==2.14.0+cpu",
