@@ -143,18 +143,6 @@ jobs:
         with:
           node-version: "22"
           package-manager-cache: false
-      - name: Publish to VS Code Marketplace
-        if: github.repository_owner == 'arm'
-        run: npx --yes @vscode/vsce@3.9.2 publish --skip-duplicate -i artifacts/vsix/*.vsix -p "${VS_MARKETPLACE_TOKEN}" ${PRE_RELEASE_FLAG}
-        env:
-          VS_MARKETPLACE_TOKEN: ${{ secrets.VS_MARKETPLACE_TOKEN }}
-          PRE_RELEASE_FLAG: ${{ contains(github.ref_name, '-') && '--pre-release' || '' }}
-      - name: Publish to Open VSX
-        if: github.repository_owner == 'arm'
-        run: npx --yes ovsx@1.0.2 publish --skip-duplicate -i artifacts/vsix/*.vsix -p "${OPEN_VSX_TOKEN}" ${PRE_RELEASE_FLAG}
-        env:
-          OPEN_VSX_TOKEN: ${{ secrets.OPEN_VSX_TOKEN }}
-          PRE_RELEASE_FLAG: ${{ contains(github.ref_name, '-') && '--pre-release' || '' }}
 
   sync-commits-to-public-repo:
     name: Sync commits to public repo
@@ -173,6 +161,7 @@ jobs:
           repository: arm/vscode-mlia
           token: ${{ secrets.ARM_ORG_TOKEN }}
           path: target-repo
+          fetch-depth: 0
           persist-credentials: true
       - name: Push commits to public repo
         env:
