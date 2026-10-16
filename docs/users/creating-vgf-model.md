@@ -8,6 +8,11 @@ SPDX-License-Identifier: Apache-2.0
 > [!NOTE]
 > This step is optional if you already have a VGF model.
 
+> [!NOTE]
+> MLIA Neural Technology supports only VGF version **0.4.3**, produced by **Model Converter v0.10.0**.
+>
+> When following the Learning Path below, use **ExecuTorch v1.5.1**, which pins Model Converter v0.10.0. Run `git checkout v1.5.1` in the cloned ExecuTorch repository before running the installation scripts.
+
 Follow the Arm Learning Path [Quantize neural upscaling models with ExecuTorch](https://learn.arm.com/learning-paths/mobile-graphics-and-gaming/quantize-neural-upscaling-models/) to create a PyTorch model, quantize it using post-training quantization (PTQ) or quantization-aware training (QAT), and export it as a `.vgf` file using the ExecuTorch Arm backend.
 
 ## Preserve debug information for MLIA

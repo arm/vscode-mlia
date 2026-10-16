@@ -17,6 +17,17 @@ You need:
 
 The extension installs and manages `uv`, Python, and MLIA.
 
+> [!NOTE]
+> **Target-device compatibility:** This project has been tested and is supported with **Arm Mali GPU driver r56p0**.
+>
+> To check the driver version on an Android device, connect it with USB debugging enabled and run the following command from a host with Android Debug Bridge (`adb`) installed:
+>
+> ```sh
+> adb shell cmd gpu vkjson
+> ```
+>
+> Look for `driverInfo` in the output for the Arm GPU. A value beginning with `Driver: v1.r56p0-` identifies the **r56p0** driver release.
+
 ## Install the extension
 
 Install **MLIA** from the Visual Studio Marketplace.

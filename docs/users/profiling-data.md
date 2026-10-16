@@ -6,6 +6,9 @@ SPDX-License-Identifier: Apache-2.0
 # Collecting profiling data
 
 > [!NOTE]
+> These instructions were checked against [ML SDK for Vulkan v2026.09.0](https://github.com/arm/ai-ml-sdk-manifest/tree/v2026.09.0) and [Neural Statistics Vulkan layer v1.0.0](https://github.com/Arm/vulkan-layer-neural-statistics/releases/tag/v1.0.0). The commands below follow the SDK manifest's default branch and the latest layer release.
+
+> [!NOTE]
 > If you only want to estimate performance from a model, skip this page and continue with [Running analyses](analyses.md).
 
 Profiling data measures a model running on a target system. MLIA uses it to analyse measured performance instead of estimating from the model alone.
@@ -28,13 +31,16 @@ Prepare the following on the host system:
 
 - Android Debug Bridge (`adb`).
 - Python 3.10 or later.
+- A C++17-capable host compiler, such as GCC or Clang, for `vgf_dump`.
 - CMake 3.25 or later and Ninja 1.10 or later.
-- An Android SDK containing a compatible platform and build-tools package.
+- An Android SDK containing `platforms;android-34` and `build-tools;34.0.0`.
 - An Android NDK and its CMake toolchain file.
 - Gradle 8.4 or later on `PATH`.
-- The `repo` tool.
+- JDK 17, required by the SDK's [Android Gradle Plugin 8.2.2](https://developer.android.com/build/releases/agp-8-2-0-release-notes#compatibility), with `JAVA_HOME` pointing to it.
+- Git and the `repo` tool.
+- Network access for Python packages, Gradle dependencies, and the `stb` headers downloaded during Scenario Runner's CMake configuration.
 - An [exported `.vgf` model](creating-vgf-model.md) and, optionally, representative input tensors.
-- An Arm64 Android device with USB debugging enabled.
+- An Arm64 Android device with USB debugging enabled and a driver that supports the model's Vulkan data-graph workload and `VK_ARM_data_graph_neural_accelerator_statistics`. See [target-device compatibility](installation.md#requirements).
 
 Confirm that the device is connected:
 
@@ -60,9 +66,11 @@ repo sync --no-clone-bundle
 export SDK_PATH="$PWD"
 ```
 
-Install the host-side build requirements:
+Install the host-side build requirements in a virtual environment:
 
 ```bash
+python3 -m venv "$SDK_PATH/.venv"
+source "$SDK_PATH/.venv/bin/activate"
 python3 -m pip install \
     -r "$SDK_PATH/sw/scenario-runner/tooling-requirements.txt"
 ```
@@ -73,11 +81,15 @@ Configure the Android tools. Replace the example paths and NDK version with the 
 export ANDROID_HOME="$HOME/Android/Sdk"
 export ANDROID_SDK_ROOT="$ANDROID_HOME"
 export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/<version>"
+export JAVA_HOME=/path/to/jdk-17
+export PATH="$JAVA_HOME/bin:$PATH"
 ```
 
-Build a debuggable Arm64 Android APK:
+Build a debuggable Arm64 Android APK. Run the build inside `sw/scenario-runner`: the SDK creates `apk_install` and `apk_package` relative to the current directory. The subshell below keeps the rest of this guide in the SDK root:
 
 ```bash
+(
+cd "$SDK_PATH/sw/scenario-runner"
 python3 "$SDK_PATH/sw/scenario-runner/scripts/build.py" \
     -j "$(nproc)" \
     --target-platform android \
@@ -93,6 +105,7 @@ python3 "$SDK_PATH/sw/scenario-runner/scripts/build.py" \
     --spirv-tools-path "$SDK_PATH/dependencies/SPIRV-Tools" \
     --vgf-lib-path "$SDK_PATH/sw/vgf-lib" \
     --package-type apk
+)
 ```
 
 The APK is produced under:
@@ -101,17 +114,19 @@ The APK is produced under:
 $SDK_PATH/sw/scenario-runner/apk_package/app/build/outputs/apk/debug/
 ```
 
-Set `APK` to the generated debug APK:
+List the generated debug APK, then set `APK` to its path. Replace `<version>` with the version in the filename, including its development timestamp:
 
 ```bash
-APK="$SDK_PATH/sw/scenario-runner/apk_package/app/build/outputs/apk/debug/app-debug.apk"
+ls "$SDK_PATH/sw/scenario-runner/apk_package/app/build/outputs/apk/debug/"*.apk
+
+APK="$SDK_PATH/sw/scenario-runner/apk_package/app/build/outputs/apk/debug/ai-ml-sdk-scenario-runner-<version>-debug.apk"
 ```
 
-See the [Scenario Runner repository](https://github.com/arm/ai-ml-sdk-scenario-runner) for current build requirements and options.
+The SDK runs Gradle's `assembleDebug` task, which produces the debuggable application needed by `run-as`. See the [Scenario Runner repository](https://github.com/arm/ai-ml-sdk-scenario-runner) for current build requirements and options.
 
 ### Download the Android capture layer
 
-Download `VkLayerNeuralStatistics-android-arm64-v8a.tar.gz` from the latest [Neural Statistics layer release](https://github.com/Arm/vulkan-layer-neural-statistics/releases/latest).
+Download `VkLayerNeuralStatistics-android-arm64-v8a.tar.gz` from the latest [Neural Statistics layer release](https://github.com/Arm/vulkan-layer-neural-statistics/releases/latest). This archive is separate from the SDK manifest checkout.
 
 With the GitHub CLI, for example:
 
@@ -135,7 +150,7 @@ Build the host `vgf_dump` tool from the VGF Library in the manifest checkout:
 ```bash
 python3 "$SDK_PATH/sw/vgf-lib/scripts/build.py" -j "$(nproc)"
 
-VGF_DUMP="$SDK_PATH/sw/vgf-lib/build-host/vgf_dump/vgf_dump"
+VGF_DUMP="$SDK_PATH/sw/vgf-lib/build/vgf_dump/vgf_dump"
 ```
 
 Generate a Scenario Runner template from the exported VGF:
@@ -150,7 +165,7 @@ cp /path/to/model.vgf workload/
     --scenario-template
 ```
 
-For a quick capture, edit `workload/scenario.json` and remove the placeholder `src` and `dst` properties. Scenario Runner initializes an input tensor to zero when it has no `src` property and does not write an output tensor when it has no `dst` property.
+For a quick capture, edit `workload/scenario.json` and remove only the input/output resource properties whose values are placeholders such as `TEMPLATE_PATH_TENSOR_INPUT_0` or `TEMPLATE_PATH_TENSOR_OUTPUT_0`. Keep the graph's `src: "model.vgf"` and any other real resource paths. Scenario Runner initializes an input tensor to zero when it has no `src` property and does not write an output tensor when it has no `dst` property.
 
 To profile representative input instead, replace each input placeholder with the name of its NumPy tensor file and copy those files into `workload/`. Output paths are optional. Use paths relative to `scenario.json` so they remain valid when the workload is copied to the Android device.
 
@@ -295,7 +310,7 @@ tar -C neural-statistics-capture-output \
     -xf neural-statistics-capture.tar
 ```
 
-The extracted directory directly containing `capture.json` is the profiling-data directory to select in MLIA for VS Code.
+In MLIA for VS Code, choose **Profiling** and add `neural-statistics-capture-output/neural-statistics-capture` as the profiling-data path. Select the extracted directory directly containing `capture.json`, rather than the tar archive or its parent directory. Then choose the Neural Technology target profile and follow [Running analyses](analyses.md#profiling).
 
 ### Validate the capture
 
