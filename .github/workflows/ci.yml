@@ -81,12 +81,36 @@ jobs:
       - name: Create extension SBOM
         run: |
           mkdir -p sbom
-          npm sbom --omit=dev --package-lock-only \
-            --sbom-format cyclonedx \
-            --sbom-type application \
-            > sbom/vscode-mlia.cdx.json
+          npm exec --yes --package=@cyclonedx/cyclonedx-npm@4.2.1 -- \
+            cyclonedx-npm --omit dev --package-lock-only \
+            --mc-type application --output-format JSON \
+            --output-file sbom/vscode-mlia.cdx.json
           python scripts/add-sbom-disclaimer.py \
             sbom/vscode-mlia.cdx.json
+      - name: Validate SBOM runtime dependencies
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          lock = json.loads(Path("package-lock.json").read_text())
+          sbom = json.loads(Path("sbom/vscode-mlia.cdx.json").read_text())
+          expected = {
+              (package.get("name") or path.rsplit("node_modules/", 1)[-1], package["version"])
+              for path, package in lock["packages"].items()
+              if path and not package.get("dev") and not package.get("link")
+          }
+          actual = {
+              ("/".join(filter(None, (component.get("group"), component["name"]))), component["version"])
+              for component in sbom.get("components", [])
+          }
+          if actual != expected:
+              raise SystemExit(
+                  f"SBOM dependency mismatch. Missing: {sorted(expected - actual)}; "
+                  f"unexpected: {sorted(actual - expected)}"
+              )
+          print(f"Verified {len(actual)} runtime dependencies in the SBOM")
+          PY
       - name: Upload SBOM artifacts
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
         with:
