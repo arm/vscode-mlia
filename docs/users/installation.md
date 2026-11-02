@@ -30,9 +30,7 @@ The extension installs and manages `uv`, Python, and MLIA.
 
 ## Install the extension
 
-Install **MLIA** from the Visual Studio Marketplace.
-
-To install a local or pre-release VSIX package instead:
+To install the MLIA for VS Code VSIX package:
 
 1. Open the **Extensions** view in VS Code.
 2. Open the view's **More Actions** menu.
