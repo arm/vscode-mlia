@@ -44,8 +44,8 @@ describe("extension packaging", () => {
     assert.strictEqual(manifest.scripts["vscode:prepublish"], "npm run bundle");
     assert.deepStrictEqual(Object.keys(manifest.dependencies ?? {}).sort(), ["yauzl"]);
     assert.strictEqual(manifest.devDependencies.yauzl, undefined);
-    assert.strictEqual(manifest.scripts.package, "vsce package --no-dependencies");
-    assert.strictEqual(manifest.scripts["package:extension"], "vsce package --no-dependencies");
+    assert.strictEqual(manifest.scripts.package, "node scripts/package.mjs");
+    assert.strictEqual(manifest.scripts["package:extension"], "npm run package");
   });
 });
 
