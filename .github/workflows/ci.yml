@@ -143,7 +143,7 @@ jobs:
           path: artifacts/sbom
       - name: Publish GitHub release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           REF_NAME: ${{ github.ref_name }}
           PRE_RELEASE: ${{ contains(github.ref_name, '-') }}
         run: |
@@ -161,12 +161,6 @@ jobs:
               --verify-tag \
               "${prerelease_args[@]}"
           fi
-      - name: Set up Node.js
-        if: github.repository_owner == 'arm'
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: "22"
-          package-manager-cache: false
 
   sync-commits-to-public-repo:
     name: Sync commits to public repo
@@ -197,30 +191,3 @@ jobs:
           git checkout main
           git merge source/main
           git push origin main
-
-  sync-release-tags-to-public-repo:
-    name: Sync release tags to public repo
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, '-') && github.repository_owner != 'arm'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout VS Code MLIA
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-        with:
-          fetch-depth: 0
-          persist-credentials: true
-      - name: Checkout public VS Code MLIA
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-        with:
-          repository: arm/vscode-mlia
-          token: ${{ secrets.ARM_ORG_TOKEN }}
-          path: target-repo
-          persist-credentials: true
-      - name: Push tag to public repo
-        env:
-          REF_NAME: ${{ github.ref_name }}
-          SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}
-        run: |
-          cd target-repo
-          git remote add source "$SOURCE_URL"
-          git fetch source --tags
-          git push origin "refs/tags/$REF_NAME"
