@@ -4,12 +4,12 @@ version = "0.0.0"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "ethos-u-vela==5.2.0",
-    "mlia==0.12.3",
+    "mlia==0.13.1",
     # Make conversion available without relying on a partner metapackage.
-    "mlia-converters-pytorch==0.1.3",
-    "mlia-converters-litert==0.1.2",
-    "mlia-ethos-u==0.2.0",
-    "mlia-neural-technology==0.2.1",
+    "mlia-converters-pytorch==0.1.5",
+    "mlia-converters-litert==0.1.4",
+    "mlia-ethos-u==0.2.2",
+    "mlia-neural-technology==0.3.1",
     "mlia-model-explorer[vgf,onnx]==0.1.1",
     # Declare Torch directly so this runtime can select its package index.
     # Keep this pin aligned with the converter's Torch requirement.
