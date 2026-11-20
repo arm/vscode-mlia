@@ -19,6 +19,6 @@ jobs:
         with:
           persist-credentials: false
       - name: Install Qlty
-        uses: qltysh/qlty-action/install@a2277a908db90c4c868832fb9204521fb940fdb4 # v1.2.0
+        uses: qltysh/qlty-action/install@08a0a862c159eae9b9003081da6663d96efef637 # v1.2.0
       - name: Check lint
         run: qlty check
