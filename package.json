@@ -2,7 +2,8 @@
   "name": "vscode-mlia",
   "displayName": "MLIA",
   "description": "Run MLIA performance analyses and explore model results in Visual Studio Code.",
-  "version": "0.1.2",
+  "version": "0.0.0",
+  "_versionNote": "Placeholder version; keep at 0.0.0. The actual version is derived dynamically from Git tags during packaging.",
   "publisher": "Arm",
   "license": "SEE LICENSE IN LICENSE",
   "private": true,
@@ -245,9 +246,10 @@
     }
   },
   "scripts": {
+    "version:sync": "node scripts/sync-version.mjs",
+    "package": "node scripts/package.mjs",
+    "package:extension": "npm run package",
     "vscode:prepublish": "npm run bundle",
-    "package": "vsce package --no-dependencies",
-    "package:extension": "vsce package --no-dependencies",
     "lint": "npm run compile && npm run lint:dependencies",
     "lint:dependencies": "eslint . --max-warnings 0",
     "bundle": "npm run lint:dependencies && esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --sourcemap --outfile=dist/extension.js",

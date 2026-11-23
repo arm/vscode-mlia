@@ -27,6 +27,7 @@ jobs:
       - name: Checkout VS Code MLIA
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
+          fetch-depth: 0
           persist-credentials: false
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
@@ -40,6 +41,8 @@ jobs:
         with:
           version: "0.11.32"
           enable-cache: false
+      - name: Set dynamic version
+        run: npm run version:sync
       - name: Run tests
         run: npm test
 
@@ -51,6 +54,7 @@ jobs:
       - name: Checkout VS Code MLIA
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
+          fetch-depth: 0
           persist-credentials: false
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
@@ -78,6 +82,8 @@ jobs:
           name: vsix-package
           path: "*.vsix"
           if-no-files-found: error
+      - name: Set dynamic version for SBOM
+        run: npm run version:sync
       - name: Create extension SBOM
         run: |
           mkdir -p sbom
